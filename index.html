@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drum Machine</title>
+  <style>
+    :root {
+      --bg: #111;
+      --surface: #1a1a1a;
+      --surface2: #222;
+      --border: #333;
+      --accent: #d946ef;
+      --accent-dim: #7e22ce;
+      --text: #e5e5e5;
+      --text-dim: #666;
+      --beat-div: #444;
+      --step-off: #2a2a2a;
+      --step-hover: #3a3a3a;
+      --playhead: rgba(217, 70, 239, 0.15);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      gap: 20px;
+    }
+
+    h1 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    h1 span { color: var(--text-dim); font-weight: 400; }
+
+    /* ── Transport Bar ── */
+    .transport {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      max-width: 960px;
+    }
+
+    .transport-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .transport-label {
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-size: 10px;
+    }
+
+    .transport-value {
+      color: var(--accent);
+      font-size: 18px;
+      font-weight: 700;
+      min-width: 48px;
+      text-align: center;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    .btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      transition: all 0.1s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+
+    .btn-play  { min-width: 80px; }
+
+    /* ── Sequencer Grid ── */
+    .sequencer {
+      width: 100%;
+      max-width: 960px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .grid-header {
+      display: grid;
+      grid-template-columns: 110px repeat(16, 1fr) 60px 46px 90px;
+      border-bottom: 1px solid var(--beat-div);
+      padding: 4px 0;
+    }
+
+    .grid-header-cell {
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 10px;
+      padding: 2px 0;
+    }
+    .grid-header-cell.beat { color: var(--text); }
+
+    .track-row {
+      display: grid;
+      grid-template-columns: 110px repeat(16, 1fr) 60px 46px 90px;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    .track-row:last-child { border-bottom: none; }
+    .track-row:hover { background: rgba(255,255,255,0.02); }
+
+    .track-name {
+      padding: 0 10px;
+      color: var(--text-dim);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      user-select: none;
+    }
+    .track-name:hover { color: var(--text); }
+    .track-name.muted { color: #333; text-decoration: line-through; }
+
+    .step-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 44px;
+      cursor: pointer;
+      border-left: 1px solid var(--border);
+      position: relative;
+      transition: background 0.08s;
+    }
+    /* Beat group dividers (every 4 steps) */
+    .step-cell:nth-child(5n+2),
+    .step-cell:nth-child(5n+6) { /* steps 1,5,9,13 = indices 2,6,10,14 in grid */}
+
+    .step-cell.beat-start { border-left: 2px solid var(--beat-div); }
+    .step-cell:hover { background: var(--step-hover); }
+    .step-cell.playhead { background: var(--playhead); }
+
+    .step-dot {
+      border-radius: 50%;
+      background: var(--accent);
+      transition: width 0.08s, height 0.08s, opacity 0.08s;
+      pointer-events: none;
+      flex-shrink: 0;
+    }
+    .step-dot.off {
+      background: var(--step-off);
+      width: 10px;
+      height: 10px;
+    }
+
+    /* Velocity bar at bottom of active step */
+    .vel-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--border);
+      pointer-events: none;
+    }
+    .vel-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      opacity: 0.6;
+      transition: width 0.05s;
+    }
+    .step-cell.dragging { cursor: ns-resize; }
+
+    /* Track volume */
+    .track-vol {
+      padding: 0 6px;
+      border-left: 1px solid var(--border);
+    }
+    .track-vol input[type=range] { width: 48px; }
+
+    /* Envelope panel toggle */
+    .track-env-btn {
+      padding: 0 8px;
+      border-left: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 44px;
+      cursor: pointer;
+      font-size: 10px;
+      color: var(--text-dim);
+      gap: 4px;
+      user-select: none;
+      transition: color 0.1s;
+    }
+    .track-env-btn:hover { color: var(--accent); }
+    .track-env-btn.open { color: var(--accent); }
+
+    /* Envelope sub-row */
+    .env-row {
+      display: none;
+      grid-column: 1 / -1;
+      background: #161616;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      gap: 24px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .env-row.open { display: flex; }
+
+    .env-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .env-group label {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .env-group .env-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .env-group input[type=range] { width: 90px; }
+    .env-group .env-val {
+      font-size: 11px;
+      color: var(--accent);
+      min-width: 36px;
+    }
+    .track-swing-btn {
+      border-left: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 44px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-dim);
+      user-select: none;
+      transition: color 0.1s;
+    }
+    .track-swing-btn:hover { color: var(--text); }
+    .track-swing-btn.on { color: var(--accent); }
+
+    .env-select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 11px;
+      padding: 3px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      outline: none;
+    }
+    .env-select:focus { border-color: var(--accent); }
+
+    .env-divider {
+      width: 1px;
+      height: 32px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+
+
+    /* Preset bar */
+    .preset-bar {
+      width: 100%;
+      max-width: 960px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+    .preset-bar .label {
+      color: var(--text-dim);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding-top: 6px;
+      white-space: nowrap;
+    }
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+    .preset-grid .btn {
+      width: 100%;
+      text-align: center;
+      padding: 6px 8px;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .preset-grid .btn.active-preset {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    @media (max-width: 700px) {
+      .preset-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* ── My Library ── */
+    .library {
+      width: 100%;
+      max-width: 960px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+    .library-header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-top: 2px;
+    }
+    .library-header .label {
+      color: var(--text-dim);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      white-space: nowrap;
+    }
+    .library-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+    .library-slot {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .library-slot-name {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 10px;
+      padding: 2px 4px;
+      width: 100%;
+      outline: none;
+      cursor: text;
+    }
+    .library-slot-name:focus { border-bottom-color: var(--accent); }
+    .library-slot-actions {
+      display: flex;
+      gap: 3px;
+    }
+    .library-slot-actions .btn {
+      flex: 1;
+      padding: 4px 2px;
+      font-size: 9px;
+      letter-spacing: 0;
+    }
+    .library-slot-actions .btn.load-btn { color: var(--accent); border-color: var(--accent-dim); }
+    .library-slot-actions .btn.save-btn { color: #4ade80; border-color: #166534; }
+    .library-slot-actions .btn.del-btn  { color: #f87171; border-color: #7f1d1d; }
+    .library-empty {
+      color: var(--text-dim);
+      font-size: 11px;
+      padding: 6px 0;
+    }
+    .btn-copy-to-lib {
+      margin-top: 6px;
+      width: 100%;
+      font-size: 10px;
+      padding: 5px 8px;
+      color: var(--accent);
+      border-color: var(--accent-dim);
+    }
+    @media (max-width: 700px) {
+      .library-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* Status */
+    .status {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+    }
+    .status span { color: var(--accent); }
+
+    /* Context hint */
+    .hint {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    @media (max-width: 700px) {
+      .grid-header, .track-row {
+        grid-template-columns: 80px repeat(16, 1fr) 50px 38px 70px;
+      }
+      .track-name { font-size: 9px; padding: 0 4px; }
+      .step-cell { height: 36px; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Drum Machine</h1>
+
+<!-- Transport -->
+<div class="transport">
+  <div class="transport-group">
+    <span class="transport-label">BPM</span>
+    <input type="range" id="bpmSlider" min="90" max="160" value="127" style="width:80px">
+    <span class="transport-value" id="bpmVal">127</span>
+  </div>
+
+  <div class="transport-group">
+    <span class="transport-label">Swing</span>
+    <input type="range" id="swingSlider" min="0" max="100" value="50" style="width:80px">
+    <span class="transport-value" id="swingVal">50%</span>
+    <span class="transport-label" id="swingMs"></span>
+  </div>
+
+  <div class="transport-group">
+    <span class="transport-label">Volume</span>
+    <input type="range" id="masterVolSlider" min="0" max="1" step="0.01" value="0.8" style="width:80px">
+    <span class="transport-value" id="masterVolVal">80%</span>
+  </div>
+
+  <div class="transport-group">
+    <span class="transport-label">Steps</span>
+    <select id="stepsSelect" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-family:inherit;font-size:12px;cursor:pointer">
+      <option value="16" selected>16</option>
+      <option value="32">32</option>
+    </select>
+  </div>
+
+  <button class="btn btn-play" id="playBtn">▶ PLAY</button>
+  <button class="btn" id="clearBtn">CLEAR</button>
+  <button class="btn" id="tapBtn">TAP TEMPO</button>
+</div>
+
+<!-- Preset bar -->
+<div class="preset-bar">
+  <div class="library-header">
+    <span class="label">Presets</span>
+    <button class="btn btn-copy-to-lib" id="copyToLibBtn" title="Copy current pattern to My Library">+ My Library</button>
+  </div>
+  <div class="preset-grid">
+    <button class="btn" data-preset="blueprint"   onclick="loadPreset('blueprint')">Blueprint</button>
+    <button class="btn" data-preset="deep-tech"   onclick="loadPreset('deep-tech')">Deep Tech</button>
+    <button class="btn" data-preset="dirty-tech"  onclick="loadPreset('dirty-tech')">Dirty Tech</button>
+    <button class="btn" data-preset="90s-house"   onclick="loadPreset('90s-house')">90s House</button>
+    <button class="btn" data-preset="jazzy-house" onclick="loadPreset('jazzy-house')">Jazzy House</button>
+    <button class="btn" data-preset="afro-house"  onclick="loadPreset('afro-house')">Afro House</button>
+    <button class="btn" data-preset="tech-house"  onclick="loadPreset('tech-house')">Tech House</button>
+    <button class="btn" data-preset="minimal"     onclick="loadPreset('minimal')">Minimal Kick</button>
+    <button class="btn" data-preset="offbeat"     onclick="loadPreset('offbeat')">Offbeat Pulse</button>
+    <button class="btn" data-preset="empty"       onclick="loadPreset('empty')">Empty</button>
+  </div>
+</div>
+
+<!-- My Library -->
+<div class="library">
+  <div class="library-header">
+    <span class="label">My Library</span>
+  </div>
+  <div class="library-grid" id="libraryGrid">
+    <span class="library-empty">No saved patterns yet. Load a preset, tweak it, then hit "+ My Library".</span>
+  </div>
+</div>
+
+<!-- Grid -->
+<div class="sequencer" id="sequencer"></div>
+
+<p class="hint">Click step to toggle &nbsp;|&nbsp; Drag up/down on active step to set velocity &nbsp;|&nbsp; Right-click to turn off &nbsp;|&nbsp; Click track name to mute</p>
+<p class="status" id="status">Stopped &nbsp;|&nbsp; Step: <span id="stepDisplay">—</span></p>
+
+<script>
+// ─────────────────────────────────────────────
+//  DATA MODEL
+// ─────────────────────────────────────────────
+
+const TRACK_DEFS = [
+  { name: "Kick",        color: "#d946ef", defaultAttack: 0.003, defaultDecay: 0.45, defaultVol: 0.95, freq: 60,  type: "kick"   },
+  { name: "Acoustic Hat",color: "#a855f7", defaultAttack: 0.002, defaultDecay: 0.08, defaultVol: 0.7,  freq: 8000, type: "hat_closed" },
+  { name: "Open Hat",    color: "#8b5cf6", defaultAttack: 0.003, defaultDecay: 0.35, defaultVol: 0.65, freq: 7000, type: "hat_open" },
+  { name: "Shaker 16",   color: "#6d28d9", defaultAttack: 0.001, defaultDecay: 0.06, defaultVol: 0.45, freq: 9000, type: "shaker"  },
+  { name: "Snare/Clap",  color: "#db2777", defaultAttack: 0.002, defaultDecay: 0.18, defaultVol: 0.85, freq: 200,  type: "snare"   },
+  { name: "Ghost Snare", color: "#be185d", defaultAttack: 0.002, defaultDecay: 0.10, defaultVol: 0.50, freq: 250,  type: "snare"   },
+  { name: "Perc Hat",    color: "#9d174d", defaultAttack: 0.008, defaultDecay: 0.12, defaultVol: 0.55, freq: 6000, type: "hat_closed" },
+];
+
+// Blueprint pattern from the PDF (16 steps, 0-indexed)
+const PRESETS = {
+  blueprint: {
+    bpm: 127, swing: 65,
+    tracks: [
+      // Kick: steps 1,5,9,13 (0-indexed: 0,4,8,12)
+      [0,4,8,12].map((i,_,a) => a.includes(_) ? null : null).fill(null).map((_,i) => ({ active:[0,4,8,12].includes(i), vel: [0,4,8,12].includes(i)?1.0:0 })),
+      // Acoustic Hat: offbeat 3,7,11,15 (0-indexed)
+      Array.from({length:16},(_,i) => ({ active:[2,6,10,14].includes(i), vel:0.7 })),
+      // Open Hat: step 15 only
+      Array.from({length:16},(_,i) => ({ active:[14].includes(i), vel:0.65 })),
+      // Shaker 16: all 16 with varying velocity
+      Array.from({length:16},(_,i) => ({ active:true, vel: i%4===0?1.0 : i%2===0?0.75 : i%4===1?0.35:0.55 })),
+      // Snare/Clap: steps 5,13 (0-indexed: 4,12)
+      Array.from({length:16},(_,i) => ({ active:[4,12].includes(i), vel:0.9 })),
+      // Ghost Snare: steps 4,10,16 (0-indexed: 3,9,15) at low velocity
+      Array.from({length:16},(_,i) => ({ active:[3,9,15].includes(i), vel:0.22 })),
+      // Perc Hat: steps 6,8,14 (0-indexed: 5,7,13)
+      Array.from({length:16},(_,i) => ({ active:[5,7,13].includes(i), vel:0.55 })),
+    ]
+  },
+  minimal: {
+    bpm: 127, swing: 25,
+    tracks: [
+      Array.from({length:16},(_,i) => ({ active:[0,4,8,12].includes(i), vel:1.0 })),
+      Array.from({length:16},(_,i) => ({ active:false, vel:0.7 })),
+      Array.from({length:16},(_,i) => ({ active:false, vel:0.65 })),
+      Array.from({length:16},(_,i) => ({ active:false, vel:0.45 })),
+      Array.from({length:16},(_,i) => ({ active:[4,12].includes(i), vel:0.85 })),
+      Array.from({length:16},(_,i) => ({ active:false, vel:0.3 })),
+      Array.from({length:16},(_,i) => ({ active:false, vel:0.55 })),
+    ]
+  },
+  offbeat: {
+    bpm: 125, swing: 40,
+    tracks: [
+      Array.from({length:16},(_,i) => ({ active:[0,4,8,12].includes(i), vel:0.9 })),
+      Array.from({length:16},(_,i) => ({ active:[2,6,10,14].includes(i), vel:0.7 })),
+      Array.from({length:16},(_,i) => ({ active:[2,6,10,14].includes(i), vel:0.6 })),
+      Array.from({length:16},(_,i) => ({ active:true, vel: i%2===0?0.8:0.4 })),
+      Array.from({length:16},(_,i) => ({ active:[4,12].includes(i), vel:0.85 })),
+      Array.from({length:16},(_,i) => ({ active:[3,11].includes(i), vel:0.25 })),
+      Array.from({length:16},(_,i) => ({ active:[5,13].includes(i), vel:0.5 })),
+    ]
+  },
+  '90s-house': {
+    bpm: 124, swing: 67,
+    tracks: [
+      // Kick (909): four-on-the-floor, steps 1,5,9,13 (0-indexed: 0,4,8,12)
+      Array.from({length:16}, (_,i) => ({ active:[0,4,8,12].includes(i), vel:0.95 })),
+      // Acoustic Hat → Offbeat closed hat (softened attack): steps 3,7,11,15 (0-indexed: 2,6,10,14)
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:0.65 })),
+      // Open Hat → Offbeat open hat (same offbeat positions, layered)
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:0.6 })),
+      // Shaker 16 → Syncopated hats: steps 2,4,10,14 (0-indexed: 1,3,9,13), varying velocity, no transient
+      Array.from({length:16}, (_,i) => ({ active:[1,3,9,13].includes(i), vel:[0.4,0.3,0.45,0.25][([1,3,9,13].indexOf(i))] || 0 })),
+      // Snare/Clap: backbeat steps 5,13 (0-indexed: 4,12)
+      Array.from({length:16}, (_,i) => ({ active:[4,12].includes(i), vel:0.9 })),
+      // Ghost Snare → Snare 2: 1 hit in bar 1 at step 6 (0-indexed: 5), ghost velocity
+      Array.from({length:16}, (_,i) => ({ active:[5].includes(i), vel:0.28 })),
+      // Perc Hat → Chord stabs: syncopated at steps 3,7,11 (0-indexed: 2,6,10)
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10].includes(i), vel:0.6 })),
+    ]
+  },
+  'jazzy-house': {
+    bpm: 123, swing: 59,
+    tracks: [
+      // Kick: four-on-the-floor with humanized velocity (0-indexed: 0,4,8,12)
+      Array.from({length:16}, (_,i) => ({
+        active: [0,4,8,12].includes(i),
+        vel: [1.0, 0, 0, 0, 0.85, 0, 0, 0, 0.92, 0, 0, 0, 0.78, 0, 0, 0][i]  || 0
+      })),
+      // Acoustic Hat → Closed Hat (filtered, soft): offbeats with varying vel
+      Array.from({length:16}, (_,i) => ({
+        active: [2,6,10,14].includes(i),
+        vel: [0,0,0.6,0,0,0,0.5,0,0,0,0.65,0,0,0,0.45,0][i] || 0
+      })),
+      // Open Hat: choking open hats on offbeats, note-length variation implied by decay
+      Array.from({length:16}, (_,i) => ({
+        active: [2,6,10,14].includes(i),
+        vel: [0,0,0.75,0,0,0,0.6,0,0,0,0.7,0,0,0,0.55,0][i] || 0
+      })),
+      // Shaker → Tambourine loop: all 16 steps, sidechain-pumping feel via velocity
+      Array.from({length:16}, (_,i) => ({
+        active: true,
+        vel: [0,4,8,12].includes(i) ? 0.25 : 0.55  // ducks on kick hits
+      })),
+      // Snare/Clap: backbeat (4,12) + dynamic clap
+      Array.from({length:16}, (_,i) => ({ active:[4,12].includes(i), vel: i===4?0.9:0.85 })),
+      // Ghost Snare: subtle ghost notes at steps 3,8,12,16 (0-indexed: 2,7,11,15)
+      Array.from({length:16}, (_,i) => ({
+        active: [2,7,11,15].includes(i),
+        vel: [0,0,0.18,0,0,0,0,0.22,0,0,0,0.16,0,0,0,0.20][i] || 0
+      })),
+      // Perc Hat → Cowbell: filtered accent at steps 4,12 (0-indexed: 3,11)
+      Array.from({length:16}, (_,i) => ({ active:[3,11].includes(i), vel:0.45 })),
+    ]
+  },
+  'jazzy-house': {
+    bpm: 123, swing: 59,
+    tracks: [
+      // Kick: four-on-the-floor, humanized velocity
+      Array.from({length:16}, (_,i) => ({ active:[0,4,8,12].includes(i), vel:[1.0,0,0,0,0.85,0,0,0,0.92,0,0,0,0.78,0,0,0][i]||0 })),
+      // Acoustic Hat → Closed Hat (filtered, soft): offbeats
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:[0,0,0.6,0,0,0,0.5,0,0,0,0.65,0,0,0,0.45,0][i]||0 })),
+      // Open Hat: choking open hats, note-length variation via decay
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:[0,0,0.75,0,0,0,0.6,0,0,0,0.7,0,0,0,0.55,0][i]||0 })),
+      // Shaker → Tambourine loop: all 16, ducks on kick hits
+      Array.from({length:16}, (_,i) => ({ active:true, vel:[0,4,8,12].includes(i)?0.25:0.55 })),
+      // Snare/Clap: backbeat
+      Array.from({length:16}, (_,i) => ({ active:[4,12].includes(i), vel:i===4?0.9:0.85 })),
+      // Ghost Snare: subtle ghost notes at 3,8,12,16 (0-indexed: 2,7,11,15)
+      Array.from({length:16}, (_,i) => ({ active:[2,7,11,15].includes(i), vel:[0,0,0.18,0,0,0,0,0.22,0,0,0,0.16,0,0,0,0.20][i]||0 })),
+      // Perc Hat → Cowbell: filtered accent at 4,12 (0-indexed: 3,11)
+      Array.from({length:16}, (_,i) => ({ active:[3,11].includes(i), vel:0.45 })),
+    ]
+  },
+  'deep-tech': {
+    bpm: 127, swing: 63,
+    tracks: [
+      // Kick (909): every quarter note
+      Array.from({length:16}, (_,i) => ({ active:[0,4,8,12].includes(i), vel:1.0 })),
+      // Acoustic Hat: offbeat (layered with open analog hit)
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:0.7 })),
+      // Open Hat: same offbeat positions
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:0.65 })),
+      // Shaker 16: all 16th notes with velocity variation (V=accent on beats)
+      Array.from({length:16}, (_,i) => ({ active:true, vel:[1.0,0.5,0.65,0.45,0.9,0.5,0.65,0.45,1.0,0.5,0.65,0.45,0.9,0.5,0.65,0.45][i] })),
+      // Snare/Clap: backbeat on 5,13 (0-indexed: 4,12)
+      Array.from({length:16}, (_,i) => ({ active:[4,12].includes(i), vel:0.9 })),
+      // Ghost Snare: unusual positions — 2,8,10,16 (0-indexed: 1,7,9,15)
+      Array.from({length:16}, (_,i) => ({ active:[1,7,9,15].includes(i), vel:0.22 })),
+      // Perc Hat → Processed Perk: offbeats 3,7,11,15 (0-indexed: 2,6,10,14)
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:0.55 })),
+    ]
+  },
+  'dirty-tech': {
+    bpm: 124, swing: 45,
+    tracks: [
+      // Kick & Sub: four-on-the-floor
+      Array.from({length:16}, (_,i) => ({ active:[0,4,8,12].includes(i), vel:1.0 })),
+      // Acoustic Hat → Ride (8th notes, ducked): steps 1,3,5,7,9,11,13,15 (0-indexed: 0,2,4,6,8,10,12,14)
+      Array.from({length:16}, (_,i) => ({ active:[0,2,4,6,8,10,12,14].includes(i), vel:0.35 })),
+      // Open Hat: offbeats 3,7,11,15 (0-indexed: 2,6,10,14)
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:0.65 })),
+      // Shaker → Syncopated Kick: steps 3,8,15 (0-indexed: 2,7,14)
+      Array.from({length:16}, (_,i) => ({ active:[2,7,14].includes(i), vel:0.7 })),
+      // Snare/Clap (loose): backbeat 5,13 (0-indexed: 4,12)
+      Array.from({length:16}, (_,i) => ({ active:[4,12].includes(i), vel:0.88 })),
+      // Ghost Snare → Snare fills: end of bar double hit at 15,16 (0-indexed: 14,15)
+      Array.from({length:16}, (_,i) => ({ active:[14,15].includes(i), vel:i===14?0.65:0.55 })),
+      // Perc Hat → Tom accent: step 7 (0-indexed: 6)
+      Array.from({length:16}, (_,i) => ({ active:[6].includes(i), vel:0.6 })),
+    ]
+  },
+  'afro-house': {
+    bpm: 124, swing: 20,
+    tracks: [
+      // Kick: four-on-the-floor, clean (0-indexed: 0,4,8,12)
+      Array.from({length:16}, (_,i) => ({ active:[0,4,8,12].includes(i), vel:0.95 })),
+      // Acoustic Hat → 16th-note hats: all steps, steady pulse with slight velocity variation
+      Array.from({length:16}, (_,i) => ({ active:true, vel:[0,4,8,12].includes(i)?0.55:0.4 })),
+      // Open Hat → Shaker accent: hits on every beat downbeat (0,4,8,12) — accents "the one"
+      Array.from({length:16}, (_,i) => ({ active:[0,4,8,12].includes(i), vel:0.8 })),
+      // Shaker 16 → Main shaker loop: all 16, rhythmic chatter with velocity variation
+      Array.from({length:16}, (_,i) => ({ active:true, vel:[0,4,8,12].includes(i)?0.7:[1,5,9,13].includes(i)?0.35:0.5 })),
+      // Snare/Clap → Reggaeton claps: syncopated positions 4,7,12,15 (0-indexed: 3,6,11,14)
+      Array.from({length:16}, (_,i) => ({ active:[3,6,11,14].includes(i), vel:[0,0,0,0.9,0,0,0.85,0,0,0,0,0.9,0,0,0.8,0][i]||0 })),
+      // Ghost Snare → Tom (spacious, reverb): same reggaeton positions, lower velocity
+      Array.from({length:16}, (_,i) => ({ active:[3,6,11,14].includes(i), vel:0.5 })),
+      // Perc Hat → Extra clap layer: accent on 4,12 (0-indexed: 3,11), ghost on others
+      Array.from({length:16}, (_,i) => ({ active:[3,6,11,14].includes(i), vel:[3,11].includes(i)?0.65:0.35 })),
+    ]
+  },
+  'tech-house': {
+    bpm: 128, swing: 30,
+    tracks: [
+      // Kick (short, aggressive): four-on-the-floor
+      Array.from({length:16}, (_,i) => ({ active:[0,4,8,12].includes(i), vel:1.0 })),
+      // Acoustic Hat → Offbeat hat (subtle overdrive): steps 3,7,11,15 (0-indexed: 2,6,10,14)
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:0.65 })),
+      // Open Hat → Stereo hats (wide): same offbeat positions, boosted width feel
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:0.55 })),
+      // Shaker → Random-pan shaker: all 16, varied velocity for stereo movement feel
+      Array.from({length:16}, (_,i) => ({ active:true, vel:[0.6,0.4,0.5,0.35,0.65,0.4,0.5,0.35,0.6,0.4,0.5,0.35,0.65,0.4,0.5,0.35][i] })),
+      // Snare/Clap → L/R stereo claps: backbeat 5,13 (0-indexed: 4,12)
+      // + center clap variant on step 5 only (lower vel = "not every bar" feel)
+      Array.from({length:16}, (_,i) => ({ active:[4,12].includes(i), vel:i===4?0.95:0.9 })),
+      // Ghost Snare → Offbeat stuttery snares: steps 4,8,12,16 (0-indexed: 3,7,11,15)
+      Array.from({length:16}, (_,i) => ({ active:[3,7,11,15].includes(i), vel:[0,0,0,0.6,0,0,0,0.45,0,0,0,0.55,0,0,0,0.5][i]||0 })),
+      // Perc Hat → Texture/grit layer: sparse, steps 3,9,13 (0-indexed: 2,8,12)
+      Array.from({length:16}, (_,i) => ({ active:[2,8,12].includes(i), vel:0.35 })),
+    ]
+  },
+  empty: {
+    bpm: 127, swing: 0,
+    tracks: TRACK_DEFS.map(() => Array.from({length:16}, () => ({ active:false, vel:0.7 })))
+  }
+};
+
+// App state
+const state = {
+  playing: false,
+  currentStep: -1,
+  bpm: 127,
+  swing: 40,        // 0–80 slider value; actual delay fraction = swing/200
+  totalSteps: 16,
+  tracks: TRACK_DEFS.map((def, ti) => ({
+    ...def,
+    attack: def.defaultAttack,
+    decay:  def.defaultDecay,
+    volume: def.defaultVol,
+    muted:  false,
+    swing:  true,
+    envOpen: false,
+    eq:   { hpFreq: 20, lowGain: 0, highGain: 0 },
+    type: def.type,          // mutable — can be changed per track
+    freq: def.freq,          // mutable — tune knob
+    name: def.name,          // mutable — rename track
+    steps: Array.from({length: 32}, () => ({ active: false, vel: 0.7 }))
+  }))
+};
+
+// Load blueprint on start
+loadPreset('blueprint');
+
+// ─────────────────────────────────────────────
+//  WEB AUDIO SYNTHESIS
+//  (No samples — synthesised drums via Web Audio)
+// ─────────────────────────────────────────────
+
+let audioCtx = null;
+let masterGain = null;
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.8;
+    masterGain.connect(audioCtx.destination);
+  }
+  return audioCtx;
+}
+
+function makeEqChain(ctx, eq) {
+  const hp = ctx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = eq.hpFreq;
+  hp.Q.value = 0.7;
+
+  const ls = ctx.createBiquadFilter();
+  ls.type = 'lowshelf';
+  ls.frequency.value = 200;
+  ls.gain.value = eq.lowGain;
+
+  const hs = ctx.createBiquadFilter();
+  hs.type = 'highshelf';
+  hs.frequency.value = 6000;
+  hs.gain.value = eq.highGain;
+
+  hp.connect(ls);
+  ls.connect(hs);
+  hs.connect(masterGain);
+  return hp; // input node
+}
+
+function synthDrum(type, freq, attack, decay, velocity, time, eq) {
+  const ctx = getAudioCtx();
+  const g = ctx.createGain();
+  const eqIn = makeEqChain(ctx, eq || { hpFreq: 20, lowGain: 0, highGain: 0 });
+  g.connect(eqIn);
+
+  const t = time || ctx.currentTime;
+
+  switch (type) {
+    case 'kick': {
+      // Sine sweep: pitch drops from ~150Hz to 40Hz
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(150, t);
+      osc.frequency.exponentialRampToValueAtTime(40, t + 0.08);
+      osc.connect(g);
+      // Click transient layer
+      const clickBuf = ctx.createBuffer(1, ctx.sampleRate * 0.005, ctx.sampleRate);
+      const cd = clickBuf.getChannelData(0);
+      for (let i = 0; i < cd.length; i++) cd[i] = (Math.random()*2-1) * (1 - i/cd.length);
+      const click = ctx.createBufferSource();
+      click.buffer = clickBuf;
+      const cg = ctx.createGain();
+      cg.gain.setValueAtTime(velocity * 0.6, t);
+      click.connect(cg); cg.connect(eqIn);
+      click.start(t);
+      // Envelope
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(velocity, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.001, t + attack + decay);
+      osc.start(t);
+      osc.stop(t + attack + decay + 0.01);
+      break;
+    }
+
+    case 'snare': {
+      // Tone + noise layer
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + decay);
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(velocity * 0.4, t);
+      og.gain.exponentialRampToValueAtTime(0.001, t + decay * 0.8);
+      osc.connect(og); og.connect(eqIn);
+      osc.start(t); osc.stop(t + decay + 0.01);
+
+      // Noise
+      const bufLen = Math.floor(ctx.sampleRate * (decay + 0.02));
+      const nBuf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+      const nd = nBuf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) nd[i] = Math.random() * 2 - 1;
+      const ns = ctx.createBufferSource();
+      ns.buffer = nBuf;
+      // High-pass filter (120Hz cutoff as per blueprint)
+      const hpf = ctx.createBiquadFilter();
+      hpf.type = 'highpass';
+      hpf.frequency.value = 120;
+      ns.connect(hpf); hpf.connect(g);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(velocity, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.001, t + attack + decay);
+      ns.start(t); ns.stop(t + attack + decay + 0.01);
+      break;
+    }
+
+    case 'hat_closed': {
+      const bufLen = Math.floor(ctx.sampleRate * (decay + 0.01));
+      const nBuf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+      const nd = nBuf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) nd[i] = Math.random() * 2 - 1;
+      const ns = ctx.createBufferSource();
+      ns.buffer = nBuf;
+      const hpf = ctx.createBiquadFilter();
+      hpf.type = 'highpass';
+      hpf.frequency.value = freq;
+      ns.connect(hpf); hpf.connect(g);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(velocity, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.001, t + attack + decay);
+      ns.start(t); ns.stop(t + attack + decay + 0.01);
+      break;
+    }
+
+    case 'hat_open': {
+      const bufLen = Math.floor(ctx.sampleRate * (decay + 0.05));
+      const nBuf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+      const nd = nBuf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) nd[i] = Math.random() * 2 - 1;
+      const ns = ctx.createBufferSource();
+      ns.buffer = nBuf;
+      const hpf = ctx.createBiquadFilter();
+      hpf.type = 'highpass';
+      hpf.frequency.value = freq;
+      const bpf = ctx.createBiquadFilter();
+      bpf.type = 'bandpass';
+      bpf.frequency.value = freq * 1.3;
+      bpf.Q.value = 0.5;
+      ns.connect(hpf); hpf.connect(bpf); bpf.connect(g);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(velocity, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.001, t + attack + decay);
+      ns.start(t); ns.stop(t + attack + decay + 0.1);
+      break;
+    }
+
+    case 'shaker': {
+      const bufLen = Math.floor(ctx.sampleRate * (decay + 0.005));
+      const nBuf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+      const nd = nBuf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) nd[i] = Math.random() * 2 - 1;
+      const ns = ctx.createBufferSource();
+      ns.buffer = nBuf;
+      const hpf = ctx.createBiquadFilter();
+      hpf.type = 'highpass';
+      hpf.frequency.value = freq;
+      const hpf2 = ctx.createBiquadFilter();
+      hpf2.type = 'highpass';
+      hpf2.frequency.value = freq * 1.2;
+      ns.connect(hpf); hpf.connect(hpf2); hpf2.connect(g);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(velocity * 0.7, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.001, t + attack + decay);
+      ns.start(t); ns.stop(t + attack + decay + 0.01);
+      break;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+//  SCHEDULER (lookahead clock)
+// ─────────────────────────────────────────────
+
+const LOOKAHEAD_MS   = 25;    // how often scheduler runs (ms)
+const SCHEDULE_AHEAD = 0.1;   // schedule this many seconds ahead
+
+let schedulerTimer  = null;
+let nextNoteTime    = 0;
+let currentBeatStep = 0;
+let activeSwing     = 0;   // swing value actually used by the scheduler
+let pendingSwing    = null; // set when user drags slider; applied on next bar
+
+function stepDurationSec() {
+  // one 16th note in seconds
+  return 60 / state.bpm / 4;
+}
+
+function swingOffset(step, trackSwingEnabled) {
+  // Delay even 16th notes (0-indexed odd steps: 1,3,5...)
+  // activeSwing 0–100: 0 = no swing, 50 = triplet feel (~66%), 100 = maximum
+  if (step % 2 === 1 && trackSwingEnabled) {
+    return (activeSwing / 100) * 0.5 * stepDurationSec();
+  }
+  return 0;
+}
+
+function scheduleStep(step, time) {
+  state.tracks.forEach(track => {
+    if (track.muted) return;
+    const s = track.steps[step];
+    if (!s || !s.active) return;
+    const t = time + swingOffset(step, track.swing);
+    synthDrum(track.type, track.freq, track.attack, track.decay, s.vel * track.volume, t, track.eq);
+  });
+}
+
+function advanceStep() {
+  nextNoteTime += stepDurationSec();
+  currentBeatStep = (currentBeatStep + 1) % state.totalSteps;
+  // Apply pending swing/BPM changes only at bar boundaries (step 0)
+  if (currentBeatStep === 0 && pendingSwing !== null) {
+    activeSwing = pendingSwing;
+    pendingSwing = null;
+  }
+}
+
+function runScheduler() {
+  const ctx = getAudioCtx();
+  while (nextNoteTime < ctx.currentTime + SCHEDULE_AHEAD) {
+    scheduleStep(currentBeatStep, nextNoteTime);
+
+    // Update UI playhead (approximate — use requestAnimationFrame for display)
+    const stepSnap = currentBeatStep;
+    const noteTimeSnap = nextNoteTime;
+    setTimeout(() => {
+      if (state.playing) {
+        updatePlayhead(stepSnap);
+      }
+    }, Math.max(0, (noteTimeSnap - ctx.currentTime) * 1000 - 10));
+
+    advanceStep();
+  }
+  schedulerTimer = setTimeout(runScheduler, LOOKAHEAD_MS);
+}
+
+function startPlayback() {
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  currentBeatStep = 0;
+  nextNoteTime = ctx.currentTime + 0.05;
+  activeSwing = state.swing;   // lock in current value at start
+  pendingSwing = null;
+  state.playing = true;
+  runScheduler();
+  document.getElementById('playBtn').textContent = '■ STOP';
+  document.getElementById('playBtn').classList.add('active');
+  document.getElementById('status').childNodes[0].textContent = 'Playing  |  Step: ';
+}
+
+function stopPlayback() {
+  state.playing = false;
+  clearTimeout(schedulerTimer);
+  updatePlayhead(-1);
+  document.getElementById('playBtn').textContent = '▶ PLAY';
+  document.getElementById('playBtn').classList.remove('active');
+  document.getElementById('status').childNodes[0].textContent = 'Stopped  |  Step: ';
+  document.getElementById('stepDisplay').textContent = '—';
+}
+
+function togglePlayback() {
+  if (state.playing) stopPlayback(); else startPlayback();
+}
+
+// ─────────────────────────────────────────────
+//  UI RENDERING
+// ─────────────────────────────────────────────
+
+function buildGrid() {
+  const seq = document.getElementById('sequencer');
+  seq.innerHTML = '';
+
+  // Header row
+  const header = document.createElement('div');
+  header.className = 'grid-header';
+  header.innerHTML = `<div class="grid-header-cell"></div>`;
+  for (let i = 1; i <= 16; i++) {
+    const isBeat = (i-1) % 4 === 0;
+    header.innerHTML += `<div class="grid-header-cell${isBeat?' beat':''}">${i}</div>`;
+  }
+  header.innerHTML += `<div class="grid-header-cell">VOL</div><div class="grid-header-cell">SW</div><div class="grid-header-cell">ENV</div>`;
+  seq.appendChild(header);
+
+  // Track rows
+  state.tracks.forEach((track, ti) => {
+    // Main row
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    row.dataset.track = ti;
+
+    // Name cell — click to mute, double-click to rename
+    const nameCell = document.createElement('div');
+    nameCell.className = `track-name${track.muted ? ' muted' : ''}`;
+    nameCell.textContent = track.name;
+    nameCell.title = 'Click to mute · Double-click to rename';
+    nameCell.addEventListener('click', () => {
+      state.tracks[ti].muted = !state.tracks[ti].muted;
+      nameCell.classList.toggle('muted');
+    });
+    nameCell.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = state.tracks[ti].name;
+      input.style.cssText = 'width:100%;background:var(--surface2);border:none;border-bottom:1px solid var(--accent);color:var(--text);font-family:inherit;font-size:11px;padding:0 4px;outline:none;';
+      nameCell.textContent = '';
+      nameCell.appendChild(input);
+      input.focus(); input.select();
+      const commit = () => {
+        const val = input.value.trim() || state.tracks[ti].name;
+        state.tracks[ti].name = val;
+        nameCell.textContent = val;
+      };
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e2 => { if (e2.key === 'Enter') input.blur(); if (e2.key === 'Escape') { input.value = state.tracks[ti].name; input.blur(); } });
+    });
+    row.appendChild(nameCell);
+
+    // Step cells
+    for (let si = 0; si < state.totalSteps; si++) {
+      const cell = document.createElement('div');
+      cell.className = `step-cell${(si % 4 === 0) ? ' beat-start' : ''}`;
+      cell.dataset.track = ti;
+      cell.dataset.step = si;
+
+      const dot = document.createElement('div');
+      dot.className = 'step-dot';
+      updateDot(dot, track.steps[si], track.color);
+      cell.appendChild(dot);
+
+      const velBar = document.createElement('div');
+      velBar.className = 'vel-bar';
+      const velFill = document.createElement('div');
+      velFill.className = 'vel-bar-fill';
+      const step = track.steps[si];
+      velFill.style.width = step.active ? Math.round(step.vel * 100) + '%' : '0%';
+      velBar.appendChild(velFill);
+      cell.appendChild(velBar);
+
+      attachStepHandlers(cell, ti, si);
+      row.appendChild(cell);
+    }
+
+    // Volume
+    const volCell = document.createElement('div');
+    volCell.className = 'track-vol';
+    const volSlider = document.createElement('input');
+    volSlider.type = 'range';
+    volSlider.min = '0'; volSlider.max = '1'; volSlider.step = '0.01';
+    volSlider.value = track.volume;
+    volSlider.title = `Volume: ${Math.round(track.volume * 100)}%`;
+    volSlider.addEventListener('input', () => {
+      state.tracks[ti].volume = parseFloat(volSlider.value);
+      volSlider.title = `Volume: ${Math.round(state.tracks[ti].volume * 100)}%`;
+    });
+    volCell.appendChild(volSlider);
+    row.appendChild(volCell);
+
+    // Swing toggle
+    const swingBtn = document.createElement('div');
+    swingBtn.className = `track-swing-btn${track.swing ? ' on' : ''}`;
+    swingBtn.textContent = '↪';
+    swingBtn.title = 'Toggle swing on this track';
+    swingBtn.addEventListener('click', () => {
+      state.tracks[ti].swing = !state.tracks[ti].swing;
+      swingBtn.classList.toggle('on', state.tracks[ti].swing);
+    });
+    row.appendChild(swingBtn);
+
+    // ENV toggle
+    const envBtn = document.createElement('div');
+    envBtn.className = `track-env-btn${track.envOpen ? ' open' : ''}`;
+    envBtn.innerHTML = `ATK/DEC ${track.envOpen ? '▲' : '▼'}`;
+    envBtn.addEventListener('click', () => toggleEnvRow(ti));
+    row.appendChild(envBtn);
+
+    seq.appendChild(row);
+
+    // Envelope sub-row
+    const envRow = document.createElement('div');
+    envRow.className = `env-row${track.envOpen ? ' open' : ''}`;
+    envRow.dataset.envrow = ti;
+    const SYNTH_TYPES = ['kick','snare','hat_closed','hat_open','shaker'];
+    const freqRanges  = { kick: [30,200], snare: [80,500], hat_closed: [2000,12000], hat_open: [2000,12000], shaker: [4000,14000] };
+    const freqRange   = freqRanges[track.type] || [20, 12000];
+
+    envRow.innerHTML = `
+      <div class="env-group">
+        <label>Sound</label>
+        <select class="env-select" data-param="type" data-track="${ti}">
+          ${SYNTH_TYPES.map(t => `<option value="${t}"${t===track.type?' selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="env-group">
+        <label>Tune</label>
+        <div class="env-controls">
+          <input type="range" min="${freqRange[0]}" max="${freqRange[1]}" step="1" value="${Math.min(Math.max(track.freq, freqRange[0]), freqRange[1])}" data-param="freq" data-track="${ti}">
+          <span class="env-val" id="freq-val-${ti}">${track.freq}Hz</span>
+        </div>
+      </div>
+      <div class="env-divider"></div>
+      <div class="env-group">
+        <label>Attack</label>
+        <div class="env-controls">
+          <input type="range" min="0.001" max="0.1" step="0.001" value="${track.attack}" data-param="attack" data-track="${ti}">
+          <span class="env-val" id="atk-val-${ti}">${msLabel(track.attack)}</span>
+        </div>
+      </div>
+      <div class="env-group">
+        <label>Decay</label>
+        <div class="env-controls">
+          <input type="range" min="0.01" max="1.0" step="0.01" value="${track.decay}" data-param="decay" data-track="${ti}">
+          <span class="env-val" id="dec-val-${ti}">${msLabel(track.decay)}</span>
+        </div>
+      </div>
+      <div class="env-divider"></div>
+      <div class="env-group">
+        <label>HP Freq</label>
+        <div class="env-controls">
+          <input type="range" min="20" max="800" step="5" value="${track.eq.hpFreq}" data-param="eq-hpFreq" data-track="${ti}">
+          <span class="env-val" id="hp-val-${ti}">${track.eq.hpFreq}Hz</span>
+        </div>
+      </div>
+      <div class="env-group">
+        <label>Low Shelf</label>
+        <div class="env-controls">
+          <input type="range" min="-12" max="12" step="0.5" value="${track.eq.lowGain}" data-param="eq-lowGain" data-track="${ti}">
+          <span class="env-val" id="ls-val-${ti}">${track.eq.lowGain > 0 ? '+' : ''}${track.eq.lowGain}dB</span>
+        </div>
+      </div>
+      <div class="env-group">
+        <label>High Shelf</label>
+        <div class="env-controls">
+          <input type="range" min="-12" max="12" step="0.5" value="${track.eq.highGain}" data-param="eq-highGain" data-track="${ti}">
+          <span class="env-val" id="hs-val-${ti}">${track.eq.highGain > 0 ? '+' : ''}${track.eq.highGain}dB</span>
+        </div>
+      </div>
+    `;
+    envRow.querySelectorAll('input[type=range]').forEach(sl => {
+      sl.addEventListener('input', () => {
+        const t2 = parseInt(sl.dataset.track);
+        const param = sl.dataset.param;
+        const val = parseFloat(sl.value);
+        if (param === 'freq') {
+          state.tracks[t2].freq = val;
+          document.getElementById(`freq-val-${t2}`).textContent = val + 'Hz';
+        } else if (param === 'attack') {
+          state.tracks[t2].attack = val;
+          document.getElementById(`atk-val-${t2}`).textContent = msLabel(val);
+        } else if (param === 'decay') {
+          state.tracks[t2].decay = val;
+          document.getElementById(`dec-val-${t2}`).textContent = msLabel(val);
+        } else if (param === 'eq-hpFreq') {
+          state.tracks[t2].eq.hpFreq = val;
+          document.getElementById(`hp-val-${t2}`).textContent = val + 'Hz';
+        } else if (param === 'eq-lowGain') {
+          state.tracks[t2].eq.lowGain = val;
+          document.getElementById(`ls-val-${t2}`).textContent = (val > 0 ? '+' : '') + val + 'dB';
+        } else if (param === 'eq-highGain') {
+          state.tracks[t2].eq.highGain = val;
+          document.getElementById(`hs-val-${t2}`).textContent = (val > 0 ? '+' : '') + val + 'dB';
+        }
+      });
+    });
+
+    // Sound type dropdown — also updates tune slider range
+    const typeSelect = envRow.querySelector('.env-select[data-param="type"]');
+    if (typeSelect) {
+      typeSelect.addEventListener('change', () => {
+        const t2 = parseInt(typeSelect.dataset.track);
+        state.tracks[t2].type = typeSelect.value;
+        // Update tune slider range to match new synth type
+        const ranges = { kick:[30,200], snare:[80,500], hat_closed:[2000,12000], hat_open:[2000,12000], shaker:[4000,14000] };
+        const r = ranges[typeSelect.value] || [20,12000];
+        const tuneSlider = envRow.querySelector(`input[data-param="freq"]`);
+        if (tuneSlider) {
+          tuneSlider.min = r[0]; tuneSlider.max = r[1];
+          // Clamp current freq value to new range
+          const clamped = Math.min(Math.max(state.tracks[t2].freq, r[0]), r[1]);
+          state.tracks[t2].freq = clamped;
+          tuneSlider.value = clamped;
+          document.getElementById(`freq-val-${t2}`).textContent = clamped + 'Hz';
+        }
+      });
+    }
+    seq.appendChild(envRow);
+  });
+}
+
+function msLabel(sec) {
+  return sec < 0.1 ? `${Math.round(sec*1000)}ms` : `${sec.toFixed(2)}s`;
+}
+
+function updateDot(dot, step, color) {
+  if (!step || !step.active) {
+    dot.classList.add('off');
+    dot.style.width = '10px';
+    dot.style.height = '10px';
+    dot.style.background = '';
+    return;
+  }
+  dot.classList.remove('off');
+  const size = Math.round(8 + step.vel * 18);
+  dot.style.width = size + 'px';
+  dot.style.height = size + 'px';
+  dot.style.background = color;
+  // Ghost notes get dimmer
+  if (step.vel < 0.35) {
+    dot.style.opacity = '0.45';
+  } else {
+    dot.style.opacity = '1';
+  }
+}
+
+function refreshStepCell(ti, si) {
+  const cell = document.querySelector(`.step-cell[data-track="${ti}"][data-step="${si}"]`);
+  if (!cell) return;
+  const step = state.tracks[ti].steps[si];
+  updateDot(cell.querySelector('.step-dot'), step, state.tracks[ti].color);
+  const fill = cell.querySelector('.vel-bar-fill');
+  if (fill) fill.style.width = step.active ? Math.round(step.vel * 100) + '%' : '0%';
+}
+
+// ── Step interaction: click to toggle, drag vertically to set velocity ──
+let dragState = null; // { ti, si, startY, startVel, didDrag }
+
+function attachStepHandlers(cell, ti, si) {
+  cell.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const step = state.tracks[ti].steps[si];
+    dragState = { ti, si, startY: e.clientY, startVel: step.active ? step.vel : 0.8, didDrag: false };
+  });
+
+  cell.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    // Right-click: toggle off if active
+    const step = state.tracks[ti].steps[si];
+    if (step.active) {
+      step.active = false;
+      refreshStepCell(ti, si);
+    }
+    dragState = null;
+  });
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (!dragState) return;
+  const dy = dragState.startY - e.clientY; // drag up = louder
+  if (Math.abs(dy) > 3) dragState.didDrag = true;
+  if (!dragState.didDrag) return;
+
+  const step = state.tracks[dragState.ti].steps[dragState.si];
+  if (!step.active) { step.active = true; }
+  step.vel = Math.min(1, Math.max(0.05, dragState.startVel + dy / 80));
+  refreshStepCell(dragState.ti, dragState.si);
+
+  const cell = document.querySelector(`.step-cell[data-track="${dragState.ti}"][data-step="${dragState.si}"]`);
+  if (cell) cell.classList.add('dragging');
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (!dragState) return;
+  if (!dragState.didDrag) {
+    // Pure click — toggle on/off
+    const step = state.tracks[dragState.ti].steps[dragState.si];
+    if (!step.active) {
+      step.active = true;
+      step.vel = 0.8;
+    } else {
+      step.active = false;
+    }
+    refreshStepCell(dragState.ti, dragState.si);
+  }
+  const cell = document.querySelector(`.step-cell[data-track="${dragState.ti}"][data-step="${dragState.si}"]`);
+  if (cell) cell.classList.remove('dragging');
+  dragState = null;
+});
+
+function toggleEnvRow(ti) {
+  state.tracks[ti].envOpen = !state.tracks[ti].envOpen;
+  const envRow = document.querySelector(`[data-envrow="${ti}"]`);
+  const envBtn = document.querySelector(`.track-row[data-track="${ti}"] .track-env-btn`);
+  if (envRow) envRow.classList.toggle('open', state.tracks[ti].envOpen);
+  if (envBtn) {
+    envBtn.classList.toggle('open', state.tracks[ti].envOpen);
+    envBtn.innerHTML = `ATK/DEC ${state.tracks[ti].envOpen ? '▲' : '▼'}`;
+  }
+}
+
+function updatePlayhead(step) {
+  document.querySelectorAll('.step-cell.playhead').forEach(c => c.classList.remove('playhead'));
+  if (step >= 0) {
+    document.querySelectorAll(`.step-cell[data-step="${step}"]`).forEach(c => c.classList.add('playhead'));
+    document.getElementById('stepDisplay').textContent = step + 1;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  TRANSPORT CONTROLS
+// ─────────────────────────────────────────────
+
+document.getElementById('playBtn').addEventListener('click', togglePlayback);
+
+document.getElementById('masterVolSlider').addEventListener('input', function() {
+  const val = parseFloat(this.value);
+  document.getElementById('masterVolVal').textContent = Math.round(val * 100) + '%';
+  if (masterGain) masterGain.gain.value = val;
+});
+
+document.getElementById('bpmSlider').addEventListener('input', function() {
+  state.bpm = parseInt(this.value);
+  document.getElementById('bpmVal').textContent = state.bpm;
+  updateSwingMs();
+});
+
+document.getElementById('swingSlider').addEventListener('input', function() {
+  state.swing = parseInt(this.value);
+  document.getElementById('swingVal').textContent = state.swing + '%';
+  updateSwingMs();
+  if (state.playing) {
+    pendingSwing = state.swing;
+  } else {
+    activeSwing = state.swing;
+  }
+});
+
+document.getElementById('stepsSelect').addEventListener('change', function() {
+  state.totalSteps = parseInt(this.value);
+  buildGrid();
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  state.tracks.forEach(track => {
+    track.steps.forEach(s => { s.active = false; });
+  });
+  buildGrid();
+});
+
+// Tap tempo
+let tapTimes = [];
+document.getElementById('tapBtn').addEventListener('click', () => {
+  const now = performance.now();
+  tapTimes.push(now);
+  tapTimes = tapTimes.filter(t => now - t < 3000).slice(-8);
+  if (tapTimes.length >= 2) {
+    const intervals = [];
+    for (let i = 1; i < tapTimes.length; i++) intervals.push(tapTimes[i] - tapTimes[i-1]);
+    const avg = intervals.reduce((a,b) => a+b, 0) / intervals.length;
+    const bpm = Math.round(60000 / avg);
+    if (bpm >= 60 && bpm <= 200) {
+      state.bpm = bpm;
+      document.getElementById('bpmSlider').value = bpm;
+      document.getElementById('bpmVal').textContent = bpm;
+    }
+  }
+});
+
+// ─────────────────────────────────────────────
+//  SWING VISUALIZER
+// ─────────────────────────────────────────────
+
+function updateSwingMs() {
+  const delayMs = (state.swing / 100) * 0.5 * (60 / state.bpm / 4) * 1000;
+  document.getElementById('swingMs').textContent = delayMs < 1 ? '0ms' : Math.round(delayMs) + 'ms delay';
+}
+
+// ─────────────────────────────────────────────
+//  PRESETS
+// ─────────────────────────────────────────────
+
+function loadPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+
+  document.querySelectorAll('.preset-grid .btn').forEach(b => b.classList.remove('active-preset'));
+  const activeBtn = document.querySelector(`.preset-grid .btn[data-preset="${name}"]`);
+  if (activeBtn) activeBtn.classList.add('active-preset');
+
+  state.bpm = p.bpm;
+  state.swing = p.swing;
+
+  document.getElementById('bpmSlider').value = p.bpm;
+  document.getElementById('bpmVal').textContent = p.bpm;
+  document.getElementById('swingSlider').value = p.swing;
+  document.getElementById('swingVal').textContent = p.swing + '%';
+
+  // Per-preset envelope overrides
+  const envelopes = {
+    'blueprint': null, // use track defaults
+    '90s-house': [
+      { attack: 0.003, decay: 0.30 },  // Kick: tight, punchy
+      { attack: 0.015, decay: 0.07 },  // Closed hat: softened attack
+      { attack: 0.018, decay: 0.30 },  // Open hat: softened attack, more release
+      { attack: 0.030, decay: 0.12 },  // Syncopated hats: no transient, varied release
+      { attack: 0.002, decay: 0.15 },  // Snare/Clap: backed-off attack, short
+      { attack: 0.012, decay: 0.10 },  // Ghost snare: brushy, soft
+      { attack: 0.005, decay: 0.20 },  // Chord stabs: short decay
+    ],
+    'jazzy-house': [
+      { attack: 0.004, decay: 0.35 },  // Kick: clean with reverb tail feel
+      { attack: 0.020, decay: 0.06 },  // Closed hat: filtered, soft
+      { attack: 0.005, decay: 0.18 },  // Open hat: choke feel — short decay
+      { attack: 0.002, decay: 0.05 },  // Tambourine: tight loop hits
+      { attack: 0.003, decay: 0.18 },  // Snare/Clap: dynamic, snappy
+      { attack: 0.008, decay: 0.08 },  // Ghost snare: very subtle, brushy
+      { attack: 0.010, decay: 0.15 },  // Cowbell: filtered, pushed back
+    ],
+    'deep-tech': [
+      { attack: 0.003, decay: 0.45 },  // Kick (909): punchy, layered shaker feel
+      { attack: 0.002, decay: 0.07 },  // Acoustic hat: tight
+      { attack: 0.003, decay: 0.25 },  // Open hat: wider analog character
+      { attack: 0.001, decay: 0.05 },  // Shaker: very short, back of mix
+      { attack: 0.002, decay: 0.14 },  // Snare/Clap: snappy, HP'd at 120Hz
+      { attack: 0.002, decay: 0.09 },  // Ghost snare: higher pitched, low vol
+      { attack: 0.008, decay: 0.10 },  // Processed perc: soft attack, gritty
+    ],
+    'dirty-tech': [
+      { attack: 0.003, decay: 0.50 },  // Kick + sub: heavy, saturated
+      { attack: 0.010, decay: 0.20 },  // Ride: no transient, ducked feel
+      { attack: 0.015, decay: 0.22 },  // Open hat: attack backed off
+      { attack: 0.012, decay: 0.30 },  // Syncopated kick: soft attack, melodic
+      { attack: 0.002, decay: 0.16 },  // Clap: loose, slightly early feel
+      { attack: 0.003, decay: 0.12 },  // Snare fills: snappy double hits
+      { attack: 0.005, decay: 0.18 },  // Tom: pitched up, off-beat accent
+    ],
+    'afro-house': [
+      { attack: 0.003, decay: 0.40 },  // Kick: clean, 1kHz cut feel
+      { attack: 0.002, decay: 0.04 },  // 16th hats: tight, continuous pulse
+      { attack: 0.002, decay: 0.06 },  // Shaker accent: punchy downbeat snap
+      { attack: 0.001, decay: 0.05 },  // Main shaker loop: very short, chattery
+      { attack: 0.003, decay: 0.12 },  // Reggaeton claps: dense, layered snap
+      { attack: 0.010, decay: 0.60 },  // Spacious tom: long reverb tail
+      { attack: 0.003, decay: 0.10 },  // Extra clap layer: tight accent
+    ],
+    'tech-house': [
+      { attack: 0.002, decay: 0.20 },  // Kick: short one-shot, tight punch
+      { attack: 0.003, decay: 0.07 },  // Offbeat hat: subtle overdrive feel
+      { attack: 0.003, decay: 0.09 },  // Stereo hats: wide, slightly more open
+      { attack: 0.001, decay: 0.04 },  // Shaker: very tight, random-pan feel
+      { attack: 0.002, decay: 0.20 },  // Stereo claps: saturated, reverb glue
+      { attack: 0.004, decay: 0.14 },  // Stuttery snares: offbeat bounce
+      { attack: 0.006, decay: 0.12 },  // Texture layer: gritty, barely audible
+    ],
+  };
+
+  state.tracks.forEach((track, ti) => {
+    const pTrack = p.tracks[ti];
+    if (!pTrack) return;
+    for (let si = 0; si < 16; si++) {
+      track.steps[si] = { ...pTrack[si] };
+    }
+    // Reset extended steps
+    for (let si = 16; si < 32; si++) {
+      track.steps[si] = { active: false, vel: 0.7 };
+    }
+    // Apply envelope overrides if defined for this preset
+    const envOverrides = envelopes[name];
+    if (envOverrides && envOverrides[ti]) {
+      track.attack = envOverrides[ti].attack;
+      track.decay  = envOverrides[ti].decay;
+    } else if (!envOverrides) {
+      // Reset to track defaults
+      track.attack = track.defaultAttack;
+      track.decay  = track.defaultDecay;
+    }
+  });
+
+  buildGrid();
+  updateSwingMs();
+}
+
+// ─────────────────────────────────────────────
+//  MY LIBRARY  (localStorage)
+// ─────────────────────────────────────────────
+
+const LIBRARY_KEY = 'drumMachineLibrary';
+
+function libraryLoad() {
+  try { return JSON.parse(localStorage.getItem(LIBRARY_KEY)) || []; }
+  catch { return []; }
+}
+
+function librarySave(slots) {
+  localStorage.setItem(LIBRARY_KEY, JSON.stringify(slots));
+}
+
+function captureCurrentPattern(name) {
+  return {
+    id: Date.now(),
+    name: name || 'Untitled',
+    bpm: state.bpm,
+    swing: state.swing,
+    tracks: state.tracks.map(t => ({
+      name:   t.name,
+      type:   t.type,
+      freq:   t.freq,
+      attack: t.attack,
+      decay:  t.decay,
+      volume: t.volume,
+      swing:  t.swing,
+      eq:     { ...t.eq },
+      steps:  t.steps.slice(0, state.totalSteps).map(s => ({ ...s })),
+    }))
+  };
+}
+
+function applyLibrarySlot(slot) {
+  state.bpm   = slot.bpm;
+  state.swing = slot.swing;
+
+  document.getElementById('bpmSlider').value    = slot.bpm;
+  document.getElementById('bpmVal').textContent = slot.bpm;
+  document.getElementById('swingSlider').value  = slot.swing;
+  document.getElementById('swingVal').textContent = slot.swing + '%';
+
+  state.tracks.forEach((track, ti) => {
+    const s = slot.tracks[ti];
+    if (!s) return;
+    if (s.name)  track.name   = s.name;
+    if (s.type)  track.type   = s.type;
+    if (s.freq)  track.freq   = s.freq;
+    track.attack = s.attack;
+    track.decay  = s.decay;
+    track.volume = s.volume;
+    track.swing  = s.swing;
+    track.eq     = { ...s.eq };
+    for (let si = 0; si < 32; si++) {
+      track.steps[si] = s.steps[si] ? { ...s.steps[si] } : { active: false, vel: 0.7 };
+    }
+  });
+
+  // Clear active-preset highlight — this is a library pattern now
+  document.querySelectorAll('.preset-grid .btn').forEach(b => b.classList.remove('active-preset'));
+
+  buildGrid();
+  updateSwingMs();
+}
+
+function renderLibrary() {
+  const slots = libraryLoad();
+  const grid  = document.getElementById('libraryGrid');
+  grid.innerHTML = '';
+
+  if (slots.length === 0) {
+    grid.innerHTML = '<span class="library-empty">No saved patterns yet. Load a preset, tweak it, then hit "+ My Library".</span>';
+    return;
+  }
+
+  slots.forEach((slot, idx) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'library-slot';
+
+    const nameInput = document.createElement('input');
+    nameInput.type  = 'text';
+    nameInput.className = 'library-slot-name';
+    nameInput.value = slot.name;
+    nameInput.title = 'Click to rename';
+    nameInput.addEventListener('change', () => {
+      const all = libraryLoad();
+      all[idx].name = nameInput.value.trim() || 'Untitled';
+      librarySave(all);
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'library-slot-actions';
+
+    const loadBtn = document.createElement('button');
+    loadBtn.className = 'btn load-btn';
+    loadBtn.textContent = 'LOAD';
+    loadBtn.addEventListener('click', () => applyLibrarySlot(libraryLoad()[idx]));
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn save-btn';
+    saveBtn.textContent = 'SAVE';
+    saveBtn.title = 'Overwrite with current pattern';
+    saveBtn.addEventListener('click', () => {
+      const all = libraryLoad();
+      const updated = captureCurrentPattern(all[idx].name);
+      updated.id = all[idx].id;
+      all[idx] = updated;
+      librarySave(all);
+      // Flash feedback
+      saveBtn.textContent = '✓';
+      setTimeout(() => { saveBtn.textContent = 'SAVE'; }, 800);
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn del-btn';
+    delBtn.textContent = 'DEL';
+    delBtn.addEventListener('click', () => {
+      const all = libraryLoad();
+      all.splice(idx, 1);
+      librarySave(all);
+      renderLibrary();
+    });
+
+    actions.append(loadBtn, saveBtn, delBtn);
+    wrap.append(nameInput, actions);
+    grid.appendChild(wrap);
+  });
+}
+
+document.getElementById('copyToLibBtn').addEventListener('click', () => {
+  const slots = libraryLoad();
+  const name  = `Pattern ${slots.length + 1}`;
+  slots.push(captureCurrentPattern(name));
+  librarySave(slots);
+  renderLibrary();
+  // Flash feedback
+  const btn = document.getElementById('copyToLibBtn');
+  btn.textContent = '✓ Saved';
+  setTimeout(() => { btn.textContent = '+ My Library'; }, 800);
+});
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+
+buildGrid();
+updateSwingMs();
+renderLibrary();
+
+// Keyboard shortcut: Space = play/stop
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) {
+    e.preventDefault();
+    togglePlayback();
+  }
+});
+</script>
+</body>
+</html>
