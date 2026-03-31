@@ -329,7 +329,7 @@
     }
     .preset-grid {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       gap: 6px;
     }
     .preset-grid .btn {
@@ -505,6 +505,7 @@
     <button class="btn" data-preset="jazzy-house" onclick="loadPreset('jazzy-house')">Jazzy House</button>
     <button class="btn" data-preset="afro-house"  onclick="loadPreset('afro-house')">Afro House</button>
     <button class="btn" data-preset="tech-house"  onclick="loadPreset('tech-house')">Tech House</button>
+    <button class="btn" data-preset="organic-house" onclick="loadPreset('organic-house')">Organic House</button>
     <button class="btn" data-preset="minimal"     onclick="loadPreset('minimal')">Minimal Kick</button>
     <button class="btn" data-preset="offbeat"     onclick="loadPreset('offbeat')">Offbeat Pulse</button>
     <button class="btn" data-preset="empty"       onclick="loadPreset('empty')">Empty</button>
@@ -734,6 +735,28 @@ const PRESETS = {
       Array.from({length:16}, (_,i) => ({ active:[3,7,11,15].includes(i), vel:[0,0,0,0.6,0,0,0,0.45,0,0,0,0.55,0,0,0,0.5][i]||0 })),
       // Perc Hat → Texture/grit layer: sparse, steps 3,9,13 (0-indexed: 2,8,12)
       Array.from({length:16}, (_,i) => ({ active:[2,8,12].includes(i), vel:0.35 })),
+    ]
+  },
+  'organic-house': {
+    bpm: 123, swing: 35,
+    tracks: [
+      // Kick (main): four-on-the-floor
+      Array.from({length:16}, (_,i) => ({ active:[0,4,8,12].includes(i), vel:1.0 })),
+      // Acoustic Hat → Closed hat (random pan/pitch feel): offbeats 3,7,11,15
+      Array.from({length:16}, (_,i) => ({ active:[2,6,10,14].includes(i), vel:[0,0,0.65,0,0,0,0.55,0,0,0,0.7,0,0,0,0.6,0][i]||0 })),
+      // Open Hat → Reverse shaker sweeps: steps 2,6,10,12 (0-indexed: 1,5,9,11)
+      Array.from({length:16}, (_,i) => ({ active:[1,5,9,11].includes(i), vel:0.4 })),
+      // Shaker → Dense percussion loops: all 16 steps, varying velocity
+      Array.from({length:16}, (_,i) => ({ active:true, vel:[0.7,0.4,0.55,0.35,0.65,0.4,0.5,0.35,0.7,0.4,0.55,0.35,0.6,0.4,0.5,0.3][i] })),
+      // Snare/Clap: backbeat 5,13 (0-indexed: 4,12)
+      Array.from({length:16}, (_,i) => ({ active:[4,12].includes(i), vel:0.9 })),
+      // Ghost Snare → Kick stomp + ghosts: stomp at step 3 (high vel), ghosts at 4,8
+      Array.from({length:16}, (_,i) => ({
+        active: [2,3,7].includes(i),
+        vel: i===2 ? 0.85 : 0.25
+      })),
+      // Perc Hat → Extra clap layer / reverse sweep: steps 2,6 (0-indexed: 1,5)
+      Array.from({length:16}, (_,i) => ({ active:[1,5].includes(i), vel:0.45 })),
     ]
   },
   empty: {
@@ -1506,6 +1529,15 @@ function loadPreset(name) {
       { attack: 0.002, decay: 0.20 },  // Stereo claps: saturated, reverb glue
       { attack: 0.004, decay: 0.14 },  // Stuttery snares: offbeat bounce
       { attack: 0.006, decay: 0.12 },  // Texture layer: gritty, barely audible
+    ],
+    'organic-house': [
+      { attack: 0.003, decay: 0.45 },  // Kick main: deep, full body
+      { attack: 0.004, decay: 0.06 },  // Closed hat: organic, short
+      { attack: 0.001, decay: 0.08 },  // Reverse shaker: short sweep feel
+      { attack: 0.002, decay: 0.04 },  // Percussion loops: tight, dense
+      { attack: 0.003, decay: 0.18 },  // Clap: four-layer stack, full
+      { attack: 0.010, decay: 0.30 },  // Kick stomp/ghost: soft attack, rolling
+      { attack: 0.001, decay: 0.10 },  // Reverse clap sweep: transitional
     ],
   };
 
