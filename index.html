@@ -489,6 +489,7 @@
   <button class="btn btn-play" id="playBtn">▶ PLAY</button>
   <button class="btn" id="clearBtn">CLEAR</button>
   <button class="btn" id="tapBtn">TAP TEMPO</button>
+  <button class="btn" id="exportBtn" title="Export pattern sheet for SP-404 MK2 TR-REC programming">SP-404 SHEET</button>
 </div>
 
 <!-- Preset bar -->
@@ -1709,6 +1710,120 @@ document.getElementById('copyToLibBtn').addEventListener('click', () => {
   btn.textContent = '✓ Saved';
   setTimeout(() => { btn.textContent = '+ My Library'; }, 800);
 });
+
+// ─────────────────────────────────────────────
+//  SP-404 MK2 PATTERN SHEET EXPORT
+// ─────────────────────────────────────────────
+
+function exportSP404Sheet() {
+  const bpm       = state.bpm;
+  const swing     = state.swing;
+  const stepSec   = 60 / bpm / 4;
+  const swingMs   = Math.round((swing / 100) * 0.5 * stepSec * 1000);
+  const totalSteps = state.totalSteps;
+
+  // Build rows: one per track
+  const rows = state.tracks.map(track => {
+    const activeSteps = [];
+    for (let si = 0; si < totalSteps; si++) {
+      const s = track.steps[si];
+      if (s && s.active) {
+        const isSwung = si % 2 === 1 && track.swing;
+        const offsetMs = isSwung ? swingMs : 0;
+        const vel127 = Math.round(s.vel * 127);
+        activeSteps.push({ step: si + 1, vel: vel127, offset: offsetMs });
+      }
+    }
+    return { name: track.name, color: track.color, swingOn: track.swing, activeSteps };
+  });
+
+  // Step header labels
+  const stepLabels = Array.from({ length: totalSteps }, (_, i) => {
+    const beat = Math.floor(i / 4) + 1;
+    const sub  = (i % 4) + 1;
+    return `${beat}.${sub}`;
+  });
+
+  // Build HTML
+  const trackRows = rows.map(row => {
+    const cells = Array.from({ length: totalSteps }, (_, si) => {
+      const hit = row.activeSteps.find(a => a.step === si + 1);
+      if (!hit) return `<td class="empty">–</td>`;
+      const offsetStr = hit.offset > 0 ? `<br><span class="offset">+${hit.offset}ms</span>` : '';
+      return `<td class="hit" style="border-top:2px solid ${row.color}">
+        <span class="vel">${hit.vel}</span>${offsetStr}
+      </td>`;
+    }).join('');
+    const swingBadge = row.swingOn ? `<span class="swing-badge">SW</span>` : '';
+    return `<tr>
+      <td class="track-name" style="border-left:3px solid ${row.color}">${row.name} ${swingBadge}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  const stepHeaders = stepLabels.map(l => `<th>${l}</th>`).join('');
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SP-404 Pattern Sheet</title>
+<style>
+  body { font-family: monospace; font-size: 11px; background: #fff; color: #111; padding: 20px; }
+  h1 { font-size: 15px; margin-bottom: 4px; }
+  .meta { font-size: 11px; color: #555; margin-bottom: 16px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ccc; padding: 4px 5px; text-align: center; min-width: 38px; }
+  th { background: #f0f0f0; font-size: 10px; }
+  td.track-name { text-align: left; min-width: 90px; font-weight: bold; background: #fafafa; }
+  td.empty { color: #ccc; }
+  td.hit { background: #f9f0ff; }
+  .vel { font-weight: bold; font-size: 12px; }
+  .offset { font-size: 9px; color: #888; }
+  .swing-badge { font-size: 8px; background: #d946ef; color: #fff; padding: 1px 3px; border-radius: 2px; margin-left: 4px; }
+  .legend { margin-top: 16px; font-size: 10px; color: #555; }
+  .legend b { color: #111; }
+  @media print { body { padding: 8px; } }
+</style>
+</head>
+<body>
+<h1>Beat Lab — SP-404 MK2 Pattern Sheet</h1>
+<div class="meta">
+  BPM: <b>${bpm}</b> &nbsp;|&nbsp;
+  Swing: <b>${swing}%</b> (odd-step offset: <b>+${swingMs}ms</b>) &nbsp;|&nbsp;
+  Steps: <b>${totalSteps}</b> &nbsp;|&nbsp;
+  Generated: <b>${new Date().toLocaleString()}</b>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>Track</th>
+      ${stepHeaders}
+    </tr>
+  </thead>
+  <tbody>
+    ${trackRows}
+  </tbody>
+</table>
+<div class="legend">
+  <b>How to use on SP-404 MK2:</b><br>
+  TR-REC mode → select pad → enter steps shown above.<br>
+  Number = velocity (0–127). &nbsp;<span style="color:#888">+Xms</span> = microscope offset (nudge step forward in time).<br>
+  <b>SW</b> badge = swing is active on this track.
+</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `beat-lab-pattern-${bpm}bpm.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('exportBtn').addEventListener('click', exportSP404Sheet);
 
 // ─────────────────────────────────────────────
 //  INIT
