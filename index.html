@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Beat Lab</title>
+  <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
   <style>
     :root {
       --bg: #111;
@@ -2009,15 +2010,18 @@ document.getElementById('sheetModal').addEventListener('click', e => {
 });
 
 // ─────────────────────────────────────────────
-//  URL SHARE (base64 encode/decode)
+//  URL SHARE (deflate + base64url)
 // ─────────────────────────────────────────────
 
 function patternToUrl() {
-  const snapshot = captureCurrentPattern('shared');
-  const json     = JSON.stringify(snapshot);
-  const b64      = btoa(unescape(encodeURIComponent(json)));
-  const url      = location.origin + location.pathname + '?p=' + b64;
-  return url;
+  const snapshot  = captureCurrentPattern('shared');
+  const json      = JSON.stringify(snapshot);
+  const bytes     = new TextEncoder().encode(json);
+  const compressed = fflate.deflateSync(bytes, { level: 9 });
+  // base64url (no padding, URL-safe chars)
+  const b64 = btoa(String.fromCharCode(...compressed))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return location.origin + location.pathname + '?p=' + b64;
 }
 
 function patternFromUrl() {
@@ -2025,7 +2029,10 @@ function patternFromUrl() {
   const b64    = params.get('p');
   if (!b64) return null;
   try {
-    const json = decodeURIComponent(escape(atob(b64)));
+    const standard = b64.replace(/-/g, '+').replace(/_/g, '/');
+    const binary   = atob(standard);
+    const bytes    = Uint8Array.from(binary, c => c.charCodeAt(0));
+    const json     = new TextDecoder().decode(fflate.inflateSync(bytes));
     return JSON.parse(json);
   } catch (e) {
     console.warn('Failed to decode pattern from URL', e);
