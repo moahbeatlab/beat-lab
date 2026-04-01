@@ -437,6 +437,29 @@
     }
     .status span { color: var(--accent); }
 
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+      z-index: 200;
+      white-space: nowrap;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
     /* Context hint */
     .hint {
       font-size: 10px;
@@ -579,6 +602,9 @@
     <span class="library-empty">No saved patterns yet. Load a preset, tweak it, then hit "+ My Library".</span>
   </div>
 </div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
 
 <!-- Help Modal -->
 <div class="modal-backdrop" id="helpModal">
@@ -2057,12 +2083,19 @@ buildGrid();
 updateSwingMs();
 renderLibrary();
 
+function showToast(msg, duration = 3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
 // Load pattern from URL if present
 const sharedPattern = patternFromUrl();
 if (sharedPattern) {
   applyLibrarySlot(sharedPattern);
-  // Clean up the URL without reloading
   history.replaceState(null, '', location.pathname);
+  showToast('✓ Pattern loaded from shared link');
 }
 
 // Keyboard shortcut: Space = play/stop
