@@ -592,7 +592,7 @@
 <!-- Grid -->
 <div class="sequencer" id="sequencer"></div>
 
-<p class="hint">Click step to toggle &nbsp;|&nbsp; Drag up/down on active step to set velocity &nbsp;|&nbsp; Right-click to turn off &nbsp;|&nbsp; Click track name to mute</p>
+<p class="hint">Click to cycle velocity &nbsp;|&nbsp; Drag left/right to paint &nbsp;|&nbsp; Alt+drag to erase &nbsp;|&nbsp; Drag up/down for fine velocity &nbsp;|&nbsp; Right-click to remove</p>
 <p class="hint" style="margin-bottom:16px">Built with <a href="https://www.anthropic.com/claude-code" target="_blank" style="color:var(--accent);text-decoration:none">Claude Code</a> by <a href="https://www.youtube.com/@moahbeatlab" target="_blank" style="color:var(--accent);text-decoration:none">moahbeatlab</a></p>
 
 <script>
@@ -1418,6 +1418,7 @@ function attachStepHandlers(cell, ti, si) {
       ti, si,
       startX: e.clientX, startY: e.clientY,
       startVel: step.active ? step.vel : VEL_CYCLE[0],
+      altKey: e.altKey,
       didDrag: false, mode: null,
       paintedSteps: new Set()
     };
@@ -1441,6 +1442,12 @@ function paintStep(ti, si, vel) {
   refreshStepCell(ti, si);
 }
 
+function eraseStep(ti, si) {
+  const step = state.tracks[ti].steps[si];
+  step.active = false;
+  refreshStepCell(ti, si);
+}
+
 document.addEventListener('mousemove', (e) => {
   if (!dragState) return;
   const dx = e.clientX - dragState.startX;
@@ -1452,12 +1459,20 @@ document.addEventListener('mousemove', (e) => {
       dragState.mode = Math.abs(dx) > Math.abs(dy) ? 'paint' : 'vel';
       dragState.didDrag = true;
       if (dragState.mode === 'paint') {
-        // Determine paint velocity: next in cycle from current state
-        const step = state.tracks[dragState.ti].steps[dragState.si];
-        const idx = step.active ? VEL_CYCLE.findIndex(v => Math.abs(v - step.vel) < 0.01) : -1;
-        dragState.paintVel = VEL_CYCLE[Math.max(0, (idx + 1) % VEL_CYCLE.length)];
-        dragState.paintedSteps.add(dragState.si);
-        paintStep(dragState.ti, dragState.si, dragState.paintVel);
+        if (dragState.altKey) {
+          // Alt held → erase mode
+          dragState.erasing = true;
+          dragState.paintedSteps.add(dragState.si);
+          eraseStep(dragState.ti, dragState.si);
+        } else {
+          // Normal paint → next velocity in cycle
+          const step = state.tracks[dragState.ti].steps[dragState.si];
+          const idx = step.active ? VEL_CYCLE.findIndex(v => Math.abs(v - step.vel) < 0.01) : -1;
+          dragState.paintVel = VEL_CYCLE[Math.max(0, (idx + 1) % VEL_CYCLE.length)];
+          dragState.erasing = false;
+          dragState.paintedSteps.add(dragState.si);
+          paintStep(dragState.ti, dragState.si, dragState.paintVel);
+        }
       }
     }
     return;
@@ -1482,7 +1497,8 @@ document.addEventListener('mousemove', (e) => {
     if (cti !== dragState.ti) return; // same track only
     if (!dragState.paintedSteps.has(csi)) {
       dragState.paintedSteps.add(csi);
-      paintStep(cti, csi, dragState.paintVel);
+      if (dragState.erasing) eraseStep(cti, csi);
+      else paintStep(cti, csi, dragState.paintVel);
     }
   }
 });
