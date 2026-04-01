@@ -490,6 +490,7 @@
   <button class="btn" id="clearBtn">CLEAR</button>
   <button class="btn" id="tapBtn">TAP TEMPO</button>
   <button class="btn" id="exportBtn" title="Export pattern sheet for SP-404 MK2 TR-REC programming">SP-404 SHEET</button>
+  <button class="btn" id="shareBtn" title="Copy shareable link to clipboard">SHARE</button>
 </div>
 
 <!-- Preset bar -->
@@ -1836,12 +1837,54 @@ function exportSP404Sheet() {
 document.getElementById('exportBtn').addEventListener('click', exportSP404Sheet);
 
 // ─────────────────────────────────────────────
+//  URL SHARE (base64 encode/decode)
+// ─────────────────────────────────────────────
+
+function patternToUrl() {
+  const snapshot = captureCurrentPattern('shared');
+  const json     = JSON.stringify(snapshot);
+  const b64      = btoa(unescape(encodeURIComponent(json)));
+  const url      = location.origin + location.pathname + '?p=' + b64;
+  return url;
+}
+
+function patternFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const b64    = params.get('p');
+  if (!b64) return null;
+  try {
+    const json = decodeURIComponent(escape(atob(b64)));
+    return JSON.parse(json);
+  } catch (e) {
+    console.warn('Failed to decode pattern from URL', e);
+    return null;
+  }
+}
+
+document.getElementById('shareBtn').addEventListener('click', () => {
+  const url = patternToUrl();
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('shareBtn');
+    btn.textContent = '✓ COPIED';
+    setTimeout(() => { btn.textContent = 'SHARE'; }, 1500);
+  });
+});
+
+// ─────────────────────────────────────────────
 //  INIT
 // ─────────────────────────────────────────────
 
 buildGrid();
 updateSwingMs();
 renderLibrary();
+
+// Load pattern from URL if present
+const sharedPattern = patternFromUrl();
+if (sharedPattern) {
+  applyLibrarySlot(sharedPattern);
+  // Clean up the URL without reloading
+  history.replaceState(null, '', location.pathname);
+}
 
 // Keyboard shortcut: Space = play/stop
 document.addEventListener('keydown', e => {
