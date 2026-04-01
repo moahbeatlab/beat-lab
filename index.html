@@ -450,6 +450,60 @@
       .track-name { font-size: 9px; padding: 0 4px; }
       .step-cell { height: 36px; }
     }
+
+    /* ── SP-404 Sheet Modal ── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #fff;
+      color: #111;
+      border-radius: 8px;
+      max-width: 1100px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+      font-family: monospace;
+      font-size: 11px;
+      position: relative;
+    }
+    .modal-close {
+      position: sticky;
+      top: 0;
+      float: right;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: monospace;
+      z-index: 1;
+    }
+    .modal h2 { font-size: 15px; margin-bottom: 4px; }
+    .modal .sheet-meta { font-size: 11px; color: #555; margin-bottom: 16px; }
+    .sheet-table { border-collapse: collapse; width: 100%; }
+    .sheet-table th, .sheet-table td { border: 1px solid #ccc; padding: 4px 5px; text-align: center; min-width: 38px; }
+    .sheet-table th { background: #f0f0f0; font-size: 10px; }
+    .sheet-table td.strack-name { text-align: left; min-width: 90px; font-weight: bold; background: #fafafa; }
+    .sheet-table td.sempty { color: #ccc; }
+    .sheet-table td.shit { background: #f9f0ff; }
+    .sheet-vel { font-weight: bold; font-size: 12px; }
+    .sheet-ticks { font-size: 9px; color: #555; font-weight: bold; display: block; }
+    .sheet-ms { font-size: 8px; color: #aaa; display: block; }
+    .sheet-swing-badge { font-size: 8px; background: #d946ef; color: #fff; padding: 1px 3px; border-radius: 2px; margin-left: 4px; }
+    .sheet-legend { margin-top: 16px; font-size: 10px; color: #555; line-height: 1.7; }
+    .sheet-legend b { color: #111; }
   </style>
 </head>
 <body>
@@ -521,6 +575,17 @@
   </div>
   <div class="library-grid" id="libraryGrid">
     <span class="library-empty">No saved patterns yet. Load a preset, tweak it, then hit "+ My Library".</span>
+  </div>
+</div>
+
+<!-- SP-404 Sheet Modal -->
+<div class="modal-backdrop" id="sheetModal">
+  <div class="modal">
+    <button class="modal-close" id="sheetModalClose">✕ CLOSE</button>
+    <h2>Beat Lab — SP-404 MK2 Pattern Sheet</h2>
+    <div class="sheet-meta" id="sheetMeta"></div>
+    <table class="sheet-table" id="sheetTable"></table>
+    <div class="sheet-legend" id="sheetLegend"></div>
   </div>
 </div>
 
@@ -1734,107 +1799,60 @@ function exportSP404Sheet() {
       if (s && s.active) {
         const isSwung = si % 2 === 1 && track.swing;
         const offsetMs = isSwung ? swingMs : 0;
-        const vel127 = Math.round(s.vel * 127);
-        activeSteps.push({ step: si + 1, vel: vel127, offset: offsetMs });
+        activeSteps.push({ step: si + 1, vel: Math.round(s.vel * 127), offset: offsetMs });
       }
     }
     return { name: track.name, color: track.color, swingOn: track.swing, activeSteps };
   });
 
-  // Step header labels
-  const stepLabels = Array.from({ length: totalSteps }, (_, i) => {
-    const beat = Math.floor(i / 4) + 1;
-    const sub  = (i % 4) + 1;
-    return `${beat}.${sub}`;
-  });
+  const stepLabels = Array.from({ length: totalSteps }, (_, i) =>
+    `${Math.floor(i / 4) + 1}.${(i % 4) + 1}`
+  );
 
-  // Build HTML
-  const trackRows = rows.map(row => {
+  // Populate meta
+  document.getElementById('sheetMeta').innerHTML =
+    `BPM: <b>${bpm}</b> &nbsp;|&nbsp;
+     Swing: <b>${swing}%</b> (odd-step offset: <b>+${swingTicks} ticks / +${swingMs}ms</b>) &nbsp;|&nbsp;
+     Steps: <b>${totalSteps}</b> &nbsp;|&nbsp;
+     1 tick ≈ <b>${msPerTick.toFixed(2)}ms</b> @ ${bpm} BPM`;
+
+  // Populate table
+  const thead = `<thead><tr><th>Track</th>${stepLabels.map(l => `<th>${l}</th>`).join('')}</tr></thead>`;
+  const tbody = '<tbody>' + rows.map(row => {
     const cells = Array.from({ length: totalSteps }, (_, si) => {
       const hit = row.activeSteps.find(a => a.step === si + 1);
-      if (!hit) return `<td class="empty">–</td>`;
+      if (!hit) return `<td class="sempty">–</td>`;
       const ticks = Math.round(hit.offset / msPerTick);
-      const offsetStr = hit.offset > 0
-        ? `<br><span class="offset">+${ticks} ticks</span><br><span class="offset-ms">(${hit.offset}ms)</span>`
+      const offsetHtml = hit.offset > 0
+        ? `<span class="sheet-ticks">+${ticks} ticks</span><span class="sheet-ms">(${hit.offset}ms)</span>`
         : '';
-      return `<td class="hit" style="border-top:2px solid ${row.color}">
-        <span class="vel">${hit.vel}</span>${offsetStr}
-      </td>`;
+      return `<td class="shit" style="border-top:2px solid ${row.color}">
+        <span class="sheet-vel">${hit.vel}</span>${offsetHtml}</td>`;
     }).join('');
-    const swingBadge = row.swingOn ? `<span class="swing-badge">SW</span>` : '';
-    return `<tr>
-      <td class="track-name" style="border-left:3px solid ${row.color}">${row.name} ${swingBadge}</td>
-      ${cells}
-    </tr>`;
-  }).join('');
+    const badge = row.swingOn ? `<span class="sheet-swing-badge">SW</span>` : '';
+    return `<tr><td class="strack-name" style="border-left:3px solid ${row.color}">${row.name}${badge}</td>${cells}</tr>`;
+  }).join('') + '</tbody>';
+  document.getElementById('sheetTable').innerHTML = thead + tbody;
 
-  const stepHeaders = stepLabels.map(l => `<th>${l}</th>`).join('');
+  // Populate legend
+  document.getElementById('sheetLegend').innerHTML =
+    `<b>How to use on SP-404 MK2:</b><br>
+     TR-REC mode → select pad → enter steps shown above.<br>
+     Number = velocity (0–127).<br>
+     <b>+X ticks</b> = microscope editing offset. SP-404 MK2 uses 480 PPQ → at ${bpm} BPM, 1 tick ≈ ${msPerTick.toFixed(2)}ms.<br>
+     In microscope view: turn the encoder clockwise to push the step late (positive ticks).<br>
+     <b>SW</b> badge = swing active on this track — apply the tick offset to those steps.`;
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>SP-404 Pattern Sheet</title>
-<style>
-  body { font-family: monospace; font-size: 11px; background: #fff; color: #111; padding: 20px; }
-  h1 { font-size: 15px; margin-bottom: 4px; }
-  .meta { font-size: 11px; color: #555; margin-bottom: 16px; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { border: 1px solid #ccc; padding: 4px 5px; text-align: center; min-width: 38px; }
-  th { background: #f0f0f0; font-size: 10px; }
-  td.track-name { text-align: left; min-width: 90px; font-weight: bold; background: #fafafa; }
-  td.empty { color: #ccc; }
-  td.hit { background: #f9f0ff; }
-  .vel { font-weight: bold; font-size: 12px; }
-  .offset { font-size: 9px; color: #555; font-weight: bold; }
-  .offset-ms { font-size: 8px; color: #aaa; }
-  .swing-badge { font-size: 8px; background: #d946ef; color: #fff; padding: 1px 3px; border-radius: 2px; margin-left: 4px; }
-  .legend { margin-top: 16px; font-size: 10px; color: #555; }
-  .legend b { color: #111; }
-  @media print { body { padding: 8px; } }
-</style>
-</head>
-<body>
-<h1>Beat Lab — SP-404 MK2 Pattern Sheet</h1>
-<div class="meta">
-  BPM: <b>${bpm}</b> &nbsp;|&nbsp;
-  Swing: <b>${swing}%</b> (odd-step offset: <b>+${swingTicks} ticks / +${swingMs}ms</b>) &nbsp;|&nbsp;
-  Steps: <b>${totalSteps}</b> &nbsp;|&nbsp;
-  1 tick ≈ <b>${msPerTick.toFixed(2)}ms</b> @ ${bpm} BPM &nbsp;|&nbsp;
-  Generated: <b>${new Date().toLocaleString()}</b>
-</div>
-<table>
-  <thead>
-    <tr>
-      <th>Track</th>
-      ${stepHeaders}
-    </tr>
-  </thead>
-  <tbody>
-    ${trackRows}
-  </tbody>
-</table>
-<div class="legend">
-  <b>How to use on SP-404 MK2:</b><br>
-  TR-REC mode → select pad → enter steps shown above.<br>
-  Number = velocity (0–127).<br>
-  <b>+X ticks</b> = microscope editing offset. SP-404 MK2 uses 480 PPQ → at ${bpm} BPM, 1 tick ≈ ${msPerTick.toFixed(2)}ms.<br>
-  In microscope view: turn the encoder clockwise to push the step late (positive ticks).<br>
-  <b>SW</b> badge = swing active on this track — apply the tick offset to those steps.
-</div>
-</body>
-</html>`;
-
-  const blob = new Blob([html], { type: 'text/html' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `beat-lab-pattern-${bpm}bpm.html`;
-  a.click();
-  URL.revokeObjectURL(url);
+  document.getElementById('sheetModal').classList.add('open');
 }
 
 document.getElementById('exportBtn').addEventListener('click', exportSP404Sheet);
+document.getElementById('sheetModalClose').addEventListener('click', () => {
+  document.getElementById('sheetModal').classList.remove('open');
+});
+document.getElementById('sheetModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('sheetModal').classList.remove('open');
+});
 
 // ─────────────────────────────────────────────
 //  URL SHARE (base64 encode/decode)
