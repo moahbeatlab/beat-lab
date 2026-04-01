@@ -1716,11 +1716,14 @@ document.getElementById('copyToLibBtn').addEventListener('click', () => {
 // ─────────────────────────────────────────────
 
 function exportSP404Sheet() {
-  const bpm       = state.bpm;
-  const swing     = state.swing;
-  const stepSec   = 60 / bpm / 4;
-  const swingMs   = Math.round((swing / 100) * 0.5 * stepSec * 1000);
+  const bpm        = state.bpm;
+  const swing      = state.swing;
+  const stepSec    = 60 / bpm / 4;
+  const swingMs    = Math.round((swing / 100) * 0.5 * stepSec * 1000);
   const totalSteps = state.totalSteps;
+  // SP-404 MK2 uses 96 PPQ; 1 tick = 60/(bpm*96) seconds
+  const msPerTick  = (60 / (bpm * 96)) * 1000;
+  const swingTicks = Math.round(swingMs / msPerTick);
 
   // Build rows: one per track
   const rows = state.tracks.map(track => {
@@ -1749,7 +1752,10 @@ function exportSP404Sheet() {
     const cells = Array.from({ length: totalSteps }, (_, si) => {
       const hit = row.activeSteps.find(a => a.step === si + 1);
       if (!hit) return `<td class="empty">–</td>`;
-      const offsetStr = hit.offset > 0 ? `<br><span class="offset">+${hit.offset}ms</span>` : '';
+      const ticks = Math.round(hit.offset / msPerTick);
+      const offsetStr = hit.offset > 0
+        ? `<br><span class="offset">+${ticks} ticks</span><br><span class="offset-ms">(${hit.offset}ms)</span>`
+        : '';
       return `<td class="hit" style="border-top:2px solid ${row.color}">
         <span class="vel">${hit.vel}</span>${offsetStr}
       </td>`;
@@ -1779,7 +1785,8 @@ function exportSP404Sheet() {
   td.empty { color: #ccc; }
   td.hit { background: #f9f0ff; }
   .vel { font-weight: bold; font-size: 12px; }
-  .offset { font-size: 9px; color: #888; }
+  .offset { font-size: 9px; color: #555; font-weight: bold; }
+  .offset-ms { font-size: 8px; color: #aaa; }
   .swing-badge { font-size: 8px; background: #d946ef; color: #fff; padding: 1px 3px; border-radius: 2px; margin-left: 4px; }
   .legend { margin-top: 16px; font-size: 10px; color: #555; }
   .legend b { color: #111; }
@@ -1790,8 +1797,9 @@ function exportSP404Sheet() {
 <h1>Beat Lab — SP-404 MK2 Pattern Sheet</h1>
 <div class="meta">
   BPM: <b>${bpm}</b> &nbsp;|&nbsp;
-  Swing: <b>${swing}%</b> (odd-step offset: <b>+${swingMs}ms</b>) &nbsp;|&nbsp;
+  Swing: <b>${swing}%</b> (odd-step offset: <b>+${swingTicks} ticks / +${swingMs}ms</b>) &nbsp;|&nbsp;
   Steps: <b>${totalSteps}</b> &nbsp;|&nbsp;
+  1 tick ≈ <b>${msPerTick.toFixed(2)}ms</b> @ ${bpm} BPM &nbsp;|&nbsp;
   Generated: <b>${new Date().toLocaleString()}</b>
 </div>
 <table>
@@ -1808,8 +1816,10 @@ function exportSP404Sheet() {
 <div class="legend">
   <b>How to use on SP-404 MK2:</b><br>
   TR-REC mode → select pad → enter steps shown above.<br>
-  Number = velocity (0–127). &nbsp;<span style="color:#888">+Xms</span> = microscope offset (nudge step forward in time).<br>
-  <b>SW</b> badge = swing is active on this track.
+  Number = velocity (0–127).<br>
+  <b>+X ticks</b> = microscope editing offset. SP-404 MK2 uses 96 PPQ → at ${bpm} BPM, 1 tick ≈ ${msPerTick.toFixed(2)}ms.<br>
+  In microscope view: turn the encoder clockwise to push the step late (positive ticks).<br>
+  <b>SW</b> badge = swing active on this track — apply the tick offset to those steps.
 </div>
 </body>
 </html>`;
