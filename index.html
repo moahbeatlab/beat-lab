@@ -685,13 +685,13 @@
 // ─────────────────────────────────────────────
 
 const TRACK_DEFS = [
-  { name: "Kick",        color: "#d946ef", defaultAttack: 0.003, defaultDecay: 0.45, defaultVol: 0.95, freq: 60,  type: "kick"   },
-  { name: "Acoustic Hat",color: "#a855f7", defaultAttack: 0.002, defaultDecay: 0.08, defaultVol: 0.7,  freq: 8000, type: "hat_closed" },
-  { name: "Open Hat",    color: "#8b5cf6", defaultAttack: 0.003, defaultDecay: 0.35, defaultVol: 0.65, freq: 7000, type: "hat_open" },
-  { name: "Shaker 16",   color: "#6d28d9", defaultAttack: 0.001, defaultDecay: 0.06, defaultVol: 0.45, freq: 9000, type: "shaker"  },
-  { name: "Snare/Clap",  color: "#db2777", defaultAttack: 0.002, defaultDecay: 0.18, defaultVol: 0.85, freq: 200,  type: "snare"   },
-  { name: "Ghost Snare", color: "#be185d", defaultAttack: 0.002, defaultDecay: 0.10, defaultVol: 0.50, freq: 250,  type: "snare"   },
-  { name: "Perc Hat",    color: "#9d174d", defaultAttack: 0.008, defaultDecay: 0.12, defaultVol: 0.55, freq: 6000, type: "hat_closed" },
+  { name: "Kick",        color: "#d946ef", defaultAttack: 0.003, defaultDecay: 0.45, defaultVol: 0.95, freq: 60,   pitch: 0, type: "kick"      },
+  { name: "Acoustic Hat",color: "#a855f7", defaultAttack: 0.002, defaultDecay: 0.08, defaultVol: 0.7,  freq: 8000, pitch: 0, type: "hat_closed" },
+  { name: "Open Hat",    color: "#8b5cf6", defaultAttack: 0.003, defaultDecay: 0.35, defaultVol: 0.65, freq: 7000, pitch: 0, type: "hat_open"   },
+  { name: "Shaker 16",   color: "#6d28d9", defaultAttack: 0.001, defaultDecay: 0.06, defaultVol: 0.45, freq: 9000, pitch: 0, type: "shaker"     },
+  { name: "Snare/Clap",  color: "#db2777", defaultAttack: 0.002, defaultDecay: 0.18, defaultVol: 0.85, freq: 200,  pitch: 0, type: "snare"      },
+  { name: "Ghost Snare", color: "#be185d", defaultAttack: 0.002, defaultDecay: 0.10, defaultVol: 0.50, freq: 250,  pitch: 0, type: "snare"      },
+  { name: "Perc Hat",    color: "#9d174d", defaultAttack: 0.008, defaultDecay: 0.12, defaultVol: 0.55, freq: 6000, pitch: 0, type: "hat_closed" },
 ];
 
 // Blueprint pattern from the PDF (16 steps, 0-indexed)
@@ -932,9 +932,10 @@ const state = {
     swing:  true,
     envOpen: false,
     eq:   { hpFreq: 20, lowGain: 0, highGain: 0 },
-    type: def.type,          // mutable — can be changed per track
-    freq: def.freq,          // mutable — tune knob
-    name: def.name,          // mutable — rename track
+    type:  def.type,          // mutable — can be changed per track
+    freq:  def.freq,          // base frequency (Hz) — read-only reference
+    pitch: def.pitch,         // mutable — semitone offset (-12 to +12)
+    name:  def.name,          // mutable — rename track
     steps: Array.from({length: 32}, () => ({ active: false, vel: 0.7 }))
   }))
 };
@@ -982,7 +983,11 @@ function makeEqChain(ctx, eq) {
   return hp; // input node
 }
 
-function synthDrum(type, freq, attack, decay, velocity, time, eq) {
+function semiToHz(baseHz, semitones) {
+  return baseHz * Math.pow(2, semitones / 12);
+}
+
+function synthDrum(type, freq, pitch, attack, decay, velocity, time, eq) {
   const ctx = getAudioCtx();
   const g = ctx.createGain();
   const eqIn = makeEqChain(ctx, eq || { hpFreq: 20, lowGain: 0, highGain: 0 });
@@ -992,11 +997,11 @@ function synthDrum(type, freq, attack, decay, velocity, time, eq) {
 
   switch (type) {
     case 'kick': {
-      // Sine sweep: pitch drops from ~150Hz to 40Hz
+      const kickHz = semiToHz(freq, pitch);
       const osc = ctx.createOscillator();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(150, t);
-      osc.frequency.exponentialRampToValueAtTime(40, t + 0.08);
+      osc.frequency.setValueAtTime(kickHz * 2.5, t);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(20, kickHz * 0.4), t + decay * 0.5);
       osc.connect(g);
       // Click transient layer
       const clickBuf = ctx.createBuffer(1, ctx.sampleRate * 0.005, ctx.sampleRate);
@@ -1021,8 +1026,9 @@ function synthDrum(type, freq, attack, decay, velocity, time, eq) {
       // Tone + noise layer
       const osc = ctx.createOscillator();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, t);
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + decay);
+      const snareHz = semiToHz(freq, pitch);
+      osc.frequency.setValueAtTime(snareHz, t);
+      osc.frequency.exponentialRampToValueAtTime(snareHz * 0.5, t + decay);
       const og = ctx.createGain();
       og.gain.setValueAtTime(velocity * 0.4, t);
       og.gain.exponentialRampToValueAtTime(0.001, t + decay * 0.8);
@@ -1057,7 +1063,7 @@ function synthDrum(type, freq, attack, decay, velocity, time, eq) {
       ns.buffer = nBuf;
       const hpf = ctx.createBiquadFilter();
       hpf.type = 'highpass';
-      hpf.frequency.value = freq;
+      hpf.frequency.value = semiToHz(freq, pitch);
       ns.connect(hpf); hpf.connect(g);
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(velocity, t + attack);
@@ -1075,10 +1081,11 @@ function synthDrum(type, freq, attack, decay, velocity, time, eq) {
       ns.buffer = nBuf;
       const hpf = ctx.createBiquadFilter();
       hpf.type = 'highpass';
-      hpf.frequency.value = freq;
+      const hatHz = semiToHz(freq, pitch);
+      hpf.frequency.value = hatHz;
       const bpf = ctx.createBiquadFilter();
       bpf.type = 'bandpass';
-      bpf.frequency.value = freq * 1.3;
+      bpf.frequency.value = hatHz * 1.3;
       bpf.Q.value = 0.5;
       ns.connect(hpf); hpf.connect(bpf); bpf.connect(g);
       g.gain.setValueAtTime(0, t);
@@ -1097,10 +1104,11 @@ function synthDrum(type, freq, attack, decay, velocity, time, eq) {
       ns.buffer = nBuf;
       const hpf = ctx.createBiquadFilter();
       hpf.type = 'highpass';
-      hpf.frequency.value = freq;
+      const shakerHz = semiToHz(freq, pitch);
+      hpf.frequency.value = shakerHz;
       const hpf2 = ctx.createBiquadFilter();
       hpf2.type = 'highpass';
-      hpf2.frequency.value = freq * 1.2;
+      hpf2.frequency.value = shakerHz * 1.2;
       ns.connect(hpf); hpf.connect(hpf2); hpf2.connect(g);
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(velocity * 0.7, t + attack);
@@ -1144,7 +1152,7 @@ function scheduleStep(step, time) {
     const s = track.steps[step];
     if (!s || !s.active) return;
     const t = time + swingOffset(step, track.swing);
-    synthDrum(track.type, track.freq, track.attack, track.decay, s.vel * track.volume, t, track.eq);
+    synthDrum(track.type, track.freq, track.pitch, track.attack, track.decay, s.vel * track.volume, t, track.eq);
   });
 }
 
@@ -1342,8 +1350,6 @@ function buildGrid() {
     envRow.className = `env-row${track.envOpen ? ' open' : ''}`;
     envRow.dataset.envrow = ti;
     const SYNTH_TYPES = ['kick','snare','hat_closed','hat_open','shaker'];
-    const freqRanges  = { kick: [30,200], snare: [80,500], hat_closed: [2000,12000], hat_open: [2000,12000], shaker: [4000,14000] };
-    const freqRange   = freqRanges[track.type] || [20, 12000];
 
     envRow.innerHTML = `
       <div class="env-group">
@@ -1353,10 +1359,10 @@ function buildGrid() {
         </select>
       </div>
       <div class="env-group">
-        <label>Tune</label>
+        <label>Pitch</label>
         <div class="env-controls">
-          <input type="range" min="${freqRange[0]}" max="${freqRange[1]}" step="1" value="${Math.min(Math.max(track.freq, freqRange[0]), freqRange[1])}" data-param="freq" data-track="${ti}">
-          <span class="env-val" id="freq-val-${ti}">${track.freq}Hz</span>
+          <input type="range" min="-12" max="12" step="1" value="${track.pitch}" data-param="pitch" data-track="${ti}">
+          <span class="env-val" id="pitch-val-${ti}">${stLabel(track.pitch)}</span>
         </div>
       </div>
       <div class="env-divider"></div>
@@ -1402,9 +1408,9 @@ function buildGrid() {
         const t2 = parseInt(sl.dataset.track);
         const param = sl.dataset.param;
         const val = parseFloat(sl.value);
-        if (param === 'freq') {
-          state.tracks[t2].freq = val;
-          document.getElementById(`freq-val-${t2}`).textContent = val + 'Hz';
+        if (param === 'pitch') {
+          state.tracks[t2].pitch = val;
+          document.getElementById(`pitch-val-${t2}`).textContent = stLabel(val);
         } else if (param === 'attack') {
           state.tracks[t2].attack = val;
           document.getElementById(`atk-val-${t2}`).textContent = msLabel(val);
@@ -1424,24 +1430,15 @@ function buildGrid() {
       });
     });
 
-    // Sound type dropdown — also updates tune slider range
+    // Sound type dropdown
     const typeSelect = envRow.querySelector('.env-select[data-param="type"]');
     if (typeSelect) {
       typeSelect.addEventListener('change', () => {
         const t2 = parseInt(typeSelect.dataset.track);
         state.tracks[t2].type = typeSelect.value;
-        // Update tune slider range to match new synth type
-        const ranges = { kick:[30,200], snare:[80,500], hat_closed:[2000,12000], hat_open:[2000,12000], shaker:[4000,14000] };
-        const r = ranges[typeSelect.value] || [20,12000];
-        const tuneSlider = envRow.querySelector(`input[data-param="freq"]`);
-        if (tuneSlider) {
-          tuneSlider.min = r[0]; tuneSlider.max = r[1];
-          // Clamp current freq value to new range
-          const clamped = Math.min(Math.max(state.tracks[t2].freq, r[0]), r[1]);
-          state.tracks[t2].freq = clamped;
-          tuneSlider.value = clamped;
-          document.getElementById(`freq-val-${t2}`).textContent = clamped + 'Hz';
-        }
+        // Reset pitch to 0 and update base freq from TRACK_DEFS when type changes
+        const def = TRACK_DEFS.find(d => d.type === typeSelect.value);
+        if (def) state.tracks[t2].freq = def.freq;
       });
     }
     seq.appendChild(envRow);
@@ -1450,6 +1447,10 @@ function buildGrid() {
 
 function msLabel(sec) {
   return sec < 0.1 ? `${Math.round(sec*1000)}ms` : `${sec.toFixed(2)}s`;
+}
+
+function stLabel(st) {
+  return st === 0 ? '0 st' : (st > 0 ? `+${st} st` : `${st} st`);
 }
 
 function updateDot(dot, step, color) {
@@ -1796,6 +1797,9 @@ function loadPreset(name) {
     for (let si = 16; si < 32; si++) {
       track.steps[si] = { active: false, vel: 0.7 };
     }
+    // Reset pitch on preset load
+    track.pitch = 0;
+
     // Apply envelope overrides if defined for this preset
     const envOverrides = envelopes[name];
     if (envOverrides && envOverrides[ti]) {
@@ -1837,6 +1841,7 @@ function captureCurrentPattern(name) {
       name:   t.name,
       type:   t.type,
       freq:   t.freq,
+      pitch:  t.pitch,
       attack: t.attack,
       decay:  t.decay,
       volume: t.volume,
@@ -1859,9 +1864,10 @@ function applyLibrarySlot(slot) {
   state.tracks.forEach((track, ti) => {
     const s = slot.tracks[ti];
     if (!s) return;
-    if (s.name)  track.name   = s.name;
-    if (s.type)  track.type   = s.type;
-    if (s.freq)  track.freq   = s.freq;
+    if (s.name)  track.name  = s.name;
+    if (s.type)  track.type  = s.type;
+    if (s.freq)  track.freq  = s.freq;
+    track.pitch  = s.pitch ?? 0;
     track.attack = s.attack;
     track.decay  = s.decay;
     track.volume = s.volume;
