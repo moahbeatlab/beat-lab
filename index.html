@@ -2007,11 +2007,10 @@ function exportSP404Sheet() {
   const bpm        = state.bpm;
   const swing      = state.swing;
   const stepSec    = 60 / bpm / 4;
-  const swingMs    = Math.round((swing / 100) * 0.5 * stepSec * 1000);
+  const stepMs     = stepSec * 1000;
+  const swingMs    = Math.round((swing / 100) * 0.5 * stepMs);
+  const startPct   = Math.round((swingMs / stepMs) * 100);
   const totalSteps = state.totalSteps;
-  // SP-404 MK2 uses 480 PPQ; 1 tick = 60/(bpm*480) seconds
-  const msPerTick  = (60 / (bpm * 480)) * 1000;
-  const swingTicks = Math.round(swingMs / msPerTick);
 
   // Build rows: one per track
   const rows = state.tracks.map(track => {
@@ -2034,9 +2033,9 @@ function exportSP404Sheet() {
   // Populate meta
   document.getElementById('sheetMeta').innerHTML =
     `BPM: <b>${bpm}</b> &nbsp;|&nbsp;
-     Swing: <b>${swing}%</b> (odd-step offset: <b>+${swingTicks} ticks / +${swingMs}ms</b>) &nbsp;|&nbsp;
+     Swing: <b>${swing}%</b> → START value: <b>+${startPct}%</b> on swung steps &nbsp;|&nbsp;
      Steps: <b>${totalSteps}</b> &nbsp;|&nbsp;
-     1 tick ≈ <b>${msPerTick.toFixed(2)}ms</b> @ ${bpm} BPM`;
+     Set SHFL RATE = <b>0</b>`;
 
   // Populate table
   const thead = `<thead><tr><th>Track</th>${stepLabels.map(l => `<th>${l}</th>`).join('')}</tr></thead>`;
@@ -2044,9 +2043,8 @@ function exportSP404Sheet() {
     const cells = Array.from({ length: totalSteps }, (_, si) => {
       const hit = row.activeSteps.find(a => a.step === si + 1);
       if (!hit) return `<td class="sempty">–</td>`;
-      const ticks = Math.round(hit.offset / msPerTick);
       const offsetHtml = hit.offset > 0
-        ? `<span class="sheet-ticks">+${ticks} ticks</span><span class="sheet-ms">(${hit.offset}ms)</span>`
+        ? `<span class="sheet-ticks">START +${startPct}%</span>`
         : '';
       return `<td class="shit" style="border-top:2px solid ${row.color}">
         <span class="sheet-vel">${hit.vel}</span>${offsetHtml}</td>`;
@@ -2058,12 +2056,11 @@ function exportSP404Sheet() {
 
   // Populate legend
   document.getElementById('sheetLegend').innerHTML =
-    `<b>How to use on SP-404 MK2:</b><br>
-     TR-REC mode → select pad → enter steps shown above.<br>
-     Number = velocity (0–127).<br>
-     <b>+X ticks</b> = microscope editing offset. SP-404 MK2 uses 480 PPQ → at ${bpm} BPM, 1 tick ≈ ${msPerTick.toFixed(2)}ms.<br>
-     In microscope view: turn the encoder clockwise to push the step late (positive ticks).<br>
-     <b>SW</b> badge = swing active on this track — apply the tick offset to those steps.`;
+    `<b>How to use on SP-404 MK2 TR-REC:</b><br>
+     1. Set <b>SHFL RATE = 0</b> (Control Knob 3 during pattern edit).<br>
+     2. Select a pad → enter each active step → set velocity shown (0–127).<br>
+     3. For steps marked <b>START +${startPct}%</b>: set the START value using Control Knob 2 on that step.<br>
+     4. <b>SW</b> badge = swing active on this track — only these tracks get START values. Tracks without SW badge: no START offset needed.`;
 
   document.getElementById('sheetModal').classList.add('open');
 }
