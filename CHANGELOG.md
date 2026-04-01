@@ -4,7 +4,7 @@ All notable changes to Beat Lab are documented here.
 
 ---
 
-## v1.3.0 — 2026-04-01
+## v0.4.0 — 2026-04-01
 
 ### Changed
 - SP-404 MK2 pattern sheet now shows per-step **START %** values instead of microscope tick offsets
@@ -21,7 +21,7 @@ All notable changes to Beat Lab are documented here.
 
 ---
 
-## v1.2.0 — 2026-03-31
+## v0.3.0 — 2026-03-31
 
 ### Added
 - **URL share**: encode full pattern as compressed base64url — copy link, share, load instantly
@@ -39,7 +39,7 @@ All notable changes to Beat Lab are documented here.
 
 ---
 
-## v1.1.0 — 2026-03-25
+## v0.2.0 — 2026-03-25
 
 ### Added
 - **My Library**: save, load, rename, delete patterns in localStorage
@@ -58,7 +58,7 @@ All notable changes to Beat Lab are documented here.
 
 ---
 
-## v1.0.0 — 2026-03-17
+## v0.1.0 — 2026-03-17
 
 ### Added
 - Initial release
