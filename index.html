@@ -1134,8 +1134,28 @@ function buildGrid() {
     const isBeat = (i-1) % 4 === 0;
     header.innerHTML += `<div class="grid-header-cell${isBeat?' beat':''}">${i}</div>`;
   }
-  header.innerHTML += `<div class="grid-header-cell">VOL</div><div class="grid-header-cell">SW</div><div class="grid-header-cell">ENV</div>`;
+  const allSwingOn = state.tracks.every(t => t.swing);
+  header.innerHTML += `<div class="grid-header-cell">VOL</div>`;
+  const swHdr = document.createElement('div');
+  swHdr.className = 'grid-header-cell';
+  swHdr.innerHTML = `<span id="swAllBtn" title="Toggle swing on all tracks" style="cursor:pointer;color:${allSwingOn ? 'var(--accent)' : 'var(--text-dim)'};user-select:none">SW</span>`;
+  header.appendChild(swHdr);
+  const envHdr = document.createElement('div');
+  envHdr.className = 'grid-header-cell';
+  envHdr.textContent = 'ENV';
+  header.appendChild(envHdr);
   seq.appendChild(header);
+
+  // SW ALL handler
+  swHdr.addEventListener('click', () => {
+    const turnOn = !state.tracks.every(t => t.swing);
+    state.tracks.forEach((t, ti) => {
+      t.swing = turnOn;
+      const btn = document.querySelector(`.track-swing-btn[data-track="${ti}"]`);
+      if (btn) btn.classList.toggle('on', turnOn);
+    });
+    swHdr.querySelector('#swAllBtn').style.color = turnOn ? 'var(--accent)' : 'var(--text-dim)';
+  });
 
   // Track rows
   state.tracks.forEach((track, ti) => {
@@ -1215,6 +1235,7 @@ function buildGrid() {
     // Swing toggle
     const swingBtn = document.createElement('div');
     swingBtn.className = `track-swing-btn${track.swing ? ' on' : ''}`;
+    swingBtn.dataset.track = ti;
     swingBtn.textContent = '↪';
     swingBtn.title = 'Toggle swing on this track';
     swingBtn.addEventListener('click', () => {
@@ -1418,13 +1439,20 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mouseup', (e) => {
   if (!dragState) return;
   if (!dragState.didDrag) {
-    // Pure click — toggle on/off
+    // Pure click: if inactive → activate cycling through velocities; if active → deactivate
     const step = state.tracks[dragState.ti].steps[dragState.si];
+    const VEL_CYCLE = [90/127, 100/127, 110/127, 1.0]; // 90, 100, 110, 127
     if (!step.active) {
       step.active = true;
-      step.vel = 0.8;
+      step.vel = VEL_CYCLE[0];
     } else {
-      step.active = false;
+      const idx = VEL_CYCLE.findIndex(v => Math.abs(v - step.vel) < 0.01);
+      const next = idx + 1;
+      if (next >= VEL_CYCLE.length) {
+        step.active = false;
+      } else {
+        step.vel = VEL_CYCLE[next];
+      }
     }
     refreshStepCell(dragState.ti, dragState.si);
   }
