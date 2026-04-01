@@ -21,6 +21,21 @@
       --playhead: rgba(217, 70, 239, 0.15);
     }
 
+    :root.light {
+      --bg: #f4f4f5;
+      --surface: #ffffff;
+      --surface2: #e4e4e7;
+      --border: #d1d5db;
+      --accent: #a21caf;
+      --accent-dim: #d946ef;
+      --text: #111111;
+      --text-dim: #888888;
+      --beat-div: #9ca3af;
+      --step-off: #e4e4e7;
+      --step-hover: #d1d5db;
+      --playhead: rgba(162, 28, 175, 0.12);
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -160,7 +175,7 @@
       user-select: none;
     }
     .track-name:hover { color: var(--text); }
-    .track-name.muted { color: #333; text-decoration: line-through; }
+    .track-name.muted { color: var(--border); text-decoration: line-through; }
 
     .step-cell {
       display: flex;
@@ -240,7 +255,7 @@
     .env-row {
       display: none;
       grid-column: 1 / -1;
-      background: #161616;
+      background: var(--surface);
       border-bottom: 1px solid var(--border);
       padding: 10px 14px;
       gap: 24px;
@@ -437,6 +452,28 @@
     }
     .status span { color: var(--accent); }
 
+    /* Theme toggle */
+    .theme-toggle {
+      position: fixed;
+      top: 24px;
+      right: calc(50% - 480px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 10px;
+      font-family: inherit;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: color 0.2s, border-color 0.2s;
+      z-index: 50;
+    }
+    .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+    @media (max-width: 1000px) { .theme-toggle { right: 16px; } }
+
     /* Toast notification */
     .toast {
       position: fixed;
@@ -533,6 +570,7 @@
 <body>
 
 <h1 style="margin-bottom:2px">Beat Lab</h1>
+<button class="theme-toggle" id="themeBtn" title="Toggle light/dark mode">LIGHT</button>
 <p class="hint" style="margin-bottom:0">A step sequencer built to explore swing, syncopation and groove — inspired by house music.</p>
 
 <!-- Transport -->
@@ -2031,6 +2069,17 @@ function exportSP404Sheet() {
 }
 
 document.getElementById('exportBtn').addEventListener('click', exportSP404Sheet);
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const isLight = document.documentElement.classList.toggle('light');
+  document.getElementById('themeBtn').textContent = isLight ? 'DARK' : 'LIGHT';
+  localStorage.setItem('beatLabTheme', isLight ? 'light' : 'dark');
+});
+// Restore saved theme
+if (localStorage.getItem('beatLabTheme') === 'light') {
+  document.documentElement.classList.add('light');
+  document.getElementById('themeBtn').textContent = 'DARK';
+}
+
 document.getElementById('helpBtn').addEventListener('click', () => document.getElementById('helpModal').classList.add('open'));
 document.getElementById('helpModalClose').addEventListener('click', () => document.getElementById('helpModal').classList.remove('open'));
 document.getElementById('helpModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.classList.remove('open'); });
