@@ -545,6 +545,7 @@
   <button class="btn" id="tapBtn">TAP TEMPO</button>
   <button class="btn" id="exportBtn" title="Export pattern sheet for SP-404 MK2 TR-REC programming">SP-404 SHEET</button>
   <button class="btn" id="shareBtn" title="Copy shareable link to clipboard">SHARE</button>
+  <button class="btn" id="helpBtn" title="Show help">HELP</button>
 </div>
 
 <!-- Preset bar -->
@@ -575,6 +576,62 @@
   </div>
   <div class="library-grid" id="libraryGrid">
     <span class="library-empty">No saved patterns yet. Load a preset, tweak it, then hit "+ My Library".</span>
+  </div>
+</div>
+
+<!-- Help Modal -->
+<div class="modal-backdrop" id="helpModal">
+  <div class="modal" style="max-width:640px">
+    <button class="modal-close" id="helpModalClose">✕ CLOSE</button>
+    <h2 style="margin-bottom:16px">Beat Lab — Help</h2>
+
+    <h3 style="font-size:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.1em">Transport</h3>
+    <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">▶ PLAY / ■ STOP</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Start or stop the sequencer. Also: <b>Space</b></td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">BPM</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Tempo slider (90–160 BPM)</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">SWING</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Global swing amount. Delays odd-numbered 16th notes. Activate per track with the ↪ button.</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">VOLUME</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Master output volume</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">STEPS</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Pattern length: 16 or 32 steps</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">CLEAR</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Clear all active steps</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">TAP TEMPO</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Tap repeatedly to set BPM</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">SP-404 SHEET</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Opens a pattern reference sheet with velocity and micro-timing values for programming the Roland SP-404 MK2</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">SHARE</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Copies a shareable link to your clipboard. Anyone opening the link gets your exact pattern loaded.</td></tr>
+    </table>
+
+    <h3 style="font-size:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.1em">Step Grid</h3>
+    <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Click</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Activate step, cycling through velocities: <b>90 → 100 → 110 → 127 → off</b></td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Drag left/right</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Paint mode — activate multiple steps at the same velocity across a track</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Alt + drag left/right</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Erase mode — remove steps as you drag across them</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Drag up/down</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Fine velocity control on a single step (drag up = louder, down = quieter)</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Right-click</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Remove a single step immediately</td></tr>
+    </table>
+
+    <h3 style="font-size:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.1em">Track Controls</h3>
+    <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Track name</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Click to <b>mute/unmute</b>. Double-click to <b>rename</b>.</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">VOL slider</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Per-track volume</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">↪ (SW)</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Toggle swing on this track. Click the <b>SW header</b> to toggle all tracks at once.</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">ATK/DEC ▼</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Expand the envelope & EQ panel for this track</td></tr>
+    </table>
+
+    <h3 style="font-size:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.1em">Envelope & EQ Panel</h3>
+    <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Sound</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Synthesizer type: kick, snare, hat (closed/open), shaker</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Tune</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Pitch / base frequency of the sound</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Attack / Decay</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Envelope shape. Short decay = punchy, long = roomy.</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">HP Freq</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">High-pass filter — cuts low end. Useful for thinning out hats or snares.</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Low Shelf / High Shelf</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Boost or cut low and high frequencies (±12 dB)</td></tr>
+    </table>
+
+    <h3 style="font-size:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.1em">Presets & Library</h3>
+    <table style="border-collapse:collapse;width:100%">
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">Presets</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Load a built-in drum pattern inspired by different house music styles</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">+ My Library</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Save the current pattern to your local library (stored in browser)</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">LOAD</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Restore a saved pattern from your library</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">SAVE</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Overwrite a library slot with the current pattern</td></tr>
+      <tr><td style="padding:4px 8px 4px 0;color:#555;white-space:nowrap">DEL</td><td style="padding:4px 0;border-left:1px solid #ddd;padding-left:8px">Delete a library slot</td></tr>
+    </table>
   </div>
 </div>
 
@@ -1941,6 +1998,9 @@ function exportSP404Sheet() {
 }
 
 document.getElementById('exportBtn').addEventListener('click', exportSP404Sheet);
+document.getElementById('helpBtn').addEventListener('click', () => document.getElementById('helpModal').classList.add('open'));
+document.getElementById('helpModalClose').addEventListener('click', () => document.getElementById('helpModal').classList.remove('open'));
+document.getElementById('helpModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.classList.remove('open'); });
 document.getElementById('sheetModalClose').addEventListener('click', () => {
   document.getElementById('sheetModal').classList.remove('open');
 });
