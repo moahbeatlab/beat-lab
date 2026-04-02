@@ -35,6 +35,7 @@
       {{ store.playing ? '■ STOP' : '▶ PLAY' }}
     </button>
     <button class="btn" @click="clearAll">CLEAR</button>
+    <button class="btn" @click="store.randomize()">RANDOMIZE</button>
     <button class="btn" @click="tapTempo">TAP TEMPO</button>
     <button class="btn" @click="openSP404()">SP-404 SHEET</button>
     <button class="btn" @click="share">{{ shareLabel }}</button>

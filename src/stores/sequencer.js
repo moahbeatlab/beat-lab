@@ -207,6 +207,26 @@ export const useSequencerStore = defineStore('sequencer', () => {
     tracks.splice(ti, 1)
   }
 
+  // ── Randomize ───────────────────────────────
+  function randomize() {
+    const DENSITY = [0.25, 0.35, 0.2, 0.45, 0.2, 0.15, 0.3]
+    const VEL_MIN = 0.55
+    const VEL_MAX = 1.0
+    tracks.forEach((track, ti) => {
+      const density = DENSITY[ti] ?? 0.25
+      for (let si = 0; si < totalSteps.value; si++) {
+        const active = Math.random() < density
+        track.steps[si].active = active
+        track.steps[si].vel = active
+          ? VEL_MIN + Math.random() * (VEL_MAX - VEL_MIN)
+          : 0.7
+      }
+      for (let si = totalSteps.value; si < 32; si++) {
+        track.steps[si].active = false
+      }
+    })
+  }
+
   // ── Toast ────────────────────────────────────────
   function showToast(msg, duration = 3000) {
     toast.value = msg
@@ -218,6 +238,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
     bpm, swing, totalSteps, playing, currentStep,
     tracks, toast,
     loadPreset,
+    randomize,
     cycleStep, setStep, adjustVelocity,
     toggleMute, toggleSwing, toggleAllSwing, toggleEnv, renameTrack, setTrackParam,
     captureCurrentPattern, applyPattern, saveToLibrary,
