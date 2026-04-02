@@ -1,4 +1,5 @@
 <template>
+  <div>
   <button class="theme-toggle" :title="isLight ? 'Switch to dark mode' : 'Switch to light mode'" @click="toggleTheme">
     {{ isLight ? 'DARK' : 'LIGHT' }}
   </button>
@@ -33,6 +34,7 @@
   <HelpModal  v-if="helpOpen"  @close="helpOpen  = false" />
 
   <div class="toast" :class="{ show: !!store.toast }">{{ store.toast }}</div>
+  </div>
 </template>
 
 <script setup>
