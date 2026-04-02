@@ -4,6 +4,24 @@ All notable changes to Beat Lab are documented here.
 
 ---
 
+## v0.5.0 — 2026-04-02
+
+### Added
+- **Vue 3 + Vite migration**: full rewrite into component-based architecture (App, TransportBar, SequencerGrid, TrackRow, StepCell, EnvPanel, LibraryPanel, Sidebar, and more)
+- **Sidebar preset navigation**: category-grouped preset browser (House / Tech House / Afro+Organic / Other) with expand/collapse
+- **Add / remove tracks**: "+ ADD TRACK" button below grid; × button to remove any track beyond the default 7
+- **Sample kit support**: TR-808, Casio-RZ1, LM-2, Roland CR-8000, MFB-512 via smplr CDN
+- **Self-hosted kit scaffolding**: TR-909, TR-606, Linn Drum slots ready — add WAV files to `public/samples/` to activate
+- **Kit availability indicator**: custom kit dropdown shows green/red dot per kit based on whether samples are present
+- **Audio export**: EXPORT button records one full loop via MediaRecorder and downloads as `.wav`
+- **"Support my channel"** section in Help modal with YouTube and Instagram links
+
+### Fixed
+- smplr kit sounds (cowbell, clave, etc.) were playing as white noise due to a race condition on load — fixed by checking `window.__smplr` synchronously and queuing notes until the kit is ready
+- Library save/load now preserves all 32 steps, track colors, muted state, and extra added tracks
+
+---
+
 ## v0.4.0 — 2026-04-01
 
 ### Changed
