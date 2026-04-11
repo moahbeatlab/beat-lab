@@ -207,6 +207,19 @@ export const useSequencerStore = defineStore('sequencer', () => {
     tracks.splice(ti, 1)
   }
 
+  // ── Total steps ─────────────────────────────
+  function setTotalSteps(n) {
+    if (n === 32 && totalSteps.value === 16) {
+      // Copy first 16 steps into slots 16–31
+      tracks.forEach(track => {
+        for (let si = 0; si < 16; si++) {
+          track.steps[si + 16] = { ...track.steps[si] }
+        }
+      })
+    }
+    totalSteps.value = n
+  }
+
   // ── Randomize ───────────────────────────────
   function randomize() {
     const DENSITY = [0.25, 0.35, 0.2, 0.45, 0.2, 0.15, 0.3]
@@ -238,6 +251,7 @@ export const useSequencerStore = defineStore('sequencer', () => {
     bpm, swing, totalSteps, playing, currentStep,
     tracks, toast,
     loadPreset,
+    setTotalSteps,
     randomize,
     cycleStep, setStep, adjustVelocity,
     toggleMute, toggleSwing, toggleAllSwing, toggleEnv, renameTrack, setTrackParam,
