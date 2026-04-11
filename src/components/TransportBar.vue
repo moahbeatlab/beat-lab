@@ -24,7 +24,7 @@
 
     <div class="transport-group">
       <span class="transport-label">Steps</span>
-      <select :value="store.totalSteps" @change="store.totalSteps = +$event.target.value"
+      <select :value="store.totalSteps" @change="store.setTotalSteps(+$event.target.value)"
         style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-family:inherit;font-size:12px;cursor:pointer">
         <option value="16">16</option>
         <option value="32">32</option>
@@ -42,6 +42,7 @@
     <button class="btn" :class="{ 'btn-rec': recording }" :disabled="recording" @click="doExport">
       {{ recording ? '● REC' : 'EXPORT' }}
     </button>
+    <button class="btn" @click="openPng()">PNG</button>
     <button class="btn" @click="openHelp()">HELP</button>
   </div>
 </template>
@@ -57,6 +58,7 @@ import { exportMix } from '../lib/exporter.js'
 const store     = useSequencerStore()
 const openSP404 = inject('openSP404')
 const openHelp  = inject('openHelp')
+const openPng   = inject('openPng')
 
 const volume     = ref(0.8)
 const shareLabel = ref('SHARE')

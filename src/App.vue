@@ -30,8 +30,9 @@
     </div>
   </div>
 
-  <SP404Modal v-if="sp404Open" @close="sp404Open = false" />
-  <HelpModal  v-if="helpOpen"  @close="helpOpen  = false" />
+  <SP404Modal      v-if="sp404Open" @close="sp404Open = false" />
+  <HelpModal       v-if="helpOpen"  @close="helpOpen  = false" />
+  <PatternPngModal v-if="pngOpen"   @close="pngOpen   = false" />
 
   <div class="toast" :class="{ show: !!store.toast }">{{ store.toast }}</div>
   </div>
@@ -47,15 +48,18 @@ import LibraryPanel   from './components/LibraryPanel.vue'
 import SequencerGrid  from './components/SequencerGrid.vue'
 import SP404Modal     from './components/SP404Modal.vue'
 import HelpModal      from './components/HelpModal.vue'
+import PatternPngModal from './components/PatternPngModal.vue'
 import Sidebar        from './components/Sidebar.vue'
 
 const store          = useSequencerStore()
 const isLight        = ref(false)
 const sp404Open      = ref(false)
 const helpOpen       = ref(false)
+const pngOpen        = ref(false)
 
 provide('openSP404', () => { sp404Open.value = true })
 provide('openHelp',  () => { helpOpen.value  = true })
+provide('openPng',   () => { pngOpen.value   = true })
 
 function toggleTheme() {
   isLight.value = !isLight.value
